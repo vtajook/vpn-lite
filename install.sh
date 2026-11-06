@@ -345,6 +345,18 @@ do_diag() {
   echo "== openvpn log =="; tail -n 12 /var/log/vpn-lite/openvpn-*.log 2>/dev/null
 }
 
+do_cert() { # Let's Encrypt certificate for a Cisco/OpenConnect connection domain (picked up automatically)
+  installed || die "vpn-lite is not installed yet"
+  ask "Connection domain of the Cisco inbound (e.g. cisco.example.com): " ""
+  [ -n "$REPLY" ] || return
+  if get_cert "$REPLY"; then
+    systemctl restart vpn-lite
+    say "done. Make sure this domain is typed in the Cisco inbound's 'connection domain' field; ocserv now uses this certificate."
+  else
+    warn "no certificate was issued"
+  fi
+}
+
 do_uninstall() { # do_uninstall purge(0|1)
   say "stopping panel and its VPN daemons"
   systemctl disable --now vpn-lite 2>/dev/null || true
@@ -397,6 +409,7 @@ while :; do
   echo "   8) Logs"
   echo "   9) Uninstall             (keeps accounts)"
   echo "  10) Uninstall and delete everything"
+  echo "   c) SSL certificate for a Cisco domain (trusted by AnyConnect)"
   echo "   d) Diagnose network (no traffic / no internet through the VPN)"
   echo "   0) Exit"
   echo
@@ -412,6 +425,7 @@ while :; do
     8) do_logs; pause;;
     9) confirm "Uninstall vpn-lite (accounts are kept)?" && { do_uninstall 0; pause; };;
     10) confirm "DELETE vpn-lite AND all accounts?" && { do_uninstall 1; pause; };;
+    c|C) do_cert; pause;;
     d|D) do_diag; pause;;
     0|q|Q|"") exit 0;;
     *) ;;

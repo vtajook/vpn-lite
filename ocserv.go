@@ -88,10 +88,9 @@ func (e *Engine) ocservDaemons(dir, run, secret string) map[string]*procDaemon {
 		return out
 	}
 	for _, in := range ins {
-		cert := strings.TrimSpace(strSetting(in.Settings, "certificate", strSetting(in.Settings, "serverCert", "")))
-		key := strings.TrimSpace(strSetting(in.Settings, "key", strSetting(in.Settings, "serverKey", "")))
+		cert, key := e.ocCertificate(in)
 		if cert == "" || key == "" {
-			Events.Add("error", "openconnect", "", "inbound %d has no certificate; not started", in.ID)
+			Events.Add("error", "openconnect", "", "inbound %d: could not prepare a TLS certificate; not started", in.ID)
 			continue
 		}
 		d := filepath.Join(dir, "oc", strconv.Itoa(in.ID))
@@ -146,4 +145,47 @@ func killOcserv(run string, s *Session) {
 		exec.Command("occtl", "-s", sock, "disconnect", "id", id).Run()
 		return
 	}
+}
+
+// ocCertificate picks the TLS certificate for a Cisco/OpenConnect inbound:
+//  1. a Let's Encrypt certificate for its connection domain, when one exists on this host
+//     (get one from the menu: vl -> certificate for a domain);
+//  2. a certificate pasted into the inbound's settings;
+//  3. otherwise a self-signed one for the connection domain, created once and stored.
+func (e *Engine) ocCertificate(in *Inbound) (cert, key string) {
+	dom := strings.TrimSpace(strSetting(in.Settings, "connDomain", ""))
+	if dom != "" && !strings.ContainsAny(dom, "/\\") {
+		c, err1 := os.ReadFile("/etc/letsencrypt/live/" + dom + "/fullchain.pem")
+		k, err2 := os.ReadFile("/etc/letsencrypt/live/" + dom + "/privkey.pem")
+		if err1 == nil && err2 == nil {
+			return strings.TrimSpace(string(c)), strings.TrimSpace(string(k))
+		}
+	}
+	cert = strings.TrimSpace(strSetting(in.Settings, "certificate", strSetting(in.Settings, "serverCert", "")))
+	key = strings.TrimSpace(strSetting(in.Settings, "key", strSetting(in.Settings, "serverKey", "")))
+	if cert != "" && key != "" {
+		return cert, key
+	}
+	host := dom
+	if host == "" {
+		host = strings.TrimSpace(in.Listen)
+	}
+	if host == "" || host == "0.0.0.0" {
+		host = "vpn-lite"
+	}
+	c, k, err := selfSignedPEM(host)
+	if err != nil {
+		return "", ""
+	}
+	e.st.mu.Lock()
+	if cur := e.st.st.Inbounds[in.ID]; cur != nil {
+		if cur.Settings == nil {
+			cur.Settings = map[string]any{}
+		}
+		cur.Settings["certificate"], cur.Settings["key"] = c, k
+		e.st.touch()
+	}
+	e.st.mu.Unlock()
+	Events.Add("info", "openconnect", "", "inbound %d: created a self-signed certificate for %s", in.ID, host)
+	return c, k
 }
