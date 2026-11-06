@@ -149,12 +149,10 @@ if [ "$first" = 1 ] && [ -r /dev/tty ] && { [ -z "$USER_" ] || [ -z "$PASS" ] ||
   fi
   if [ -z "$PASS" ]; then
     while :; do
-      read -r -s -p "Admin password (min 8 chars, empty = generate one): " PASS </dev/tty || true; echo
+      read -r -p "Admin password (min 8 chars, shown as you type, empty = generate one): " PASS </dev/tty || true
       [ -z "$PASS" ] && break
-      if [ "${#PASS}" -lt 8 ]; then echo "too short, try again"; continue; fi
-      read -r -s -p "Repeat password: " PASS2 </dev/tty || true; echo
-      [ "$PASS" = "$PASS2" ] && break
-      echo "passwords differ, try again"; PASS=""
+      [ "${#PASS}" -ge 8 ] && break
+      echo "too short, try again"
     done
   fi
   if [ -z "$PORT" ]; then
