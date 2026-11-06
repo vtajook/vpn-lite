@@ -458,6 +458,9 @@ func (a *API) uiSetSettings(w http.ResponseWriter, r *http.Request) {
 		cur.SessionMinutes = g.SessionMinutes
 	}
 	cur.TgToken, cur.TgChat, cur.TgNoLogin = strings.TrimSpace(g.TgToken), strings.TrimSpace(g.TgChat), g.TgNoLogin
+	if g.TgCpuAlert >= 0 && g.TgCpuAlert <= 100 {
+		cur.TgCpuAlert, cur.TgCpuTouched = g.TgCpuAlert, true
+	}
 	if g.TgBackupHours >= 0 && g.TgBackupHours <= 720 {
 		cur.TgBackupHours = g.TgBackupHours
 	}

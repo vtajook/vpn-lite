@@ -157,3 +157,42 @@ func (s *Store) NotifyLogin(okLogin bool, user, ip string) {
 	tgLastFail = time.Now()
 	s.TgNotify(fmt.Sprintf("⚠️ Failed panel login\nserver: %s\nuser tried: %s\nIP: %s\ntime: %s", host, user, ip, now))
 }
+
+// AlertLoop watches the CPU and messages the admin when it stays above the threshold for
+// two minutes (once per 30 minutes), and again when it is back to normal.
+func (s *Store) AlertLoop(stop <-chan struct{}) {
+	t := time.NewTicker(30 * time.Second)
+	defer t.Stop()
+	hot, alerted := 0, false
+	var lastAlert time.Time
+	for {
+		select {
+		case <-stop:
+			return
+		case <-t.C:
+		}
+		s.mu.RLock()
+		thr := s.st.Global.TgCpuAlert
+		on := s.st.Global.TgToken != "" && s.st.Global.TgChat != ""
+		s.mu.RUnlock()
+		if thr <= 0 || !on {
+			hot, alerted = 0, false
+			continue
+		}
+		cpu := readSys().CPU
+		host, _ := os.Hostname()
+		if cpu >= float64(thr) {
+			hot++
+			if hot >= 4 && time.Since(lastAlert) > 30*time.Minute {
+				lastAlert, alerted = time.Now(), true
+				s.TgNotify(fmt.Sprintf("🔥 High CPU\nserver: %s\nCPU: %.0f%% (limit %d%%)\nload: %s", host, cpu, thr, readSys().Load))
+			}
+		} else {
+			hot = 0
+			if alerted && cpu < float64(thr)-10 {
+				alerted = false
+				s.TgNotify(fmt.Sprintf("✅ CPU back to normal\nserver: %s\nCPU: %.0f%%", host, cpu))
+			}
+		}
+	}
+}

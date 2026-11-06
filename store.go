@@ -91,6 +91,8 @@ type GlobalSettings struct {
 	TgChat        string `json:"tgChat"`
 	TgBackupHours int    `json:"tgBackupHours"` // 0 = off
 	TgNoLogin     bool   `json:"tgNoLogin"`     // true = do not message panel logins
+	TgCpuAlert    int    `json:"tgCpuAlert"`    // message when CPU stays above this percent (0 = off)
+	TgCpuTouched  bool   `json:"tgCpuTouched"`  // set once the admin saved the field (so 0 really means off)
 }
 
 type Store struct {
@@ -139,6 +141,10 @@ func OpenStore(path string) (*Store, error) {
 	g := &s.st.Global
 	if g.BasePath == "" {
 		g.BasePath = "/"
+		s.dirty = true
+	}
+	if g.TgCpuAlert == 0 && !g.TgCpuTouched {
+		g.TgCpuAlert = 80
 		s.dirty = true
 	}
 	if g.SessionMinutes == 0 {
