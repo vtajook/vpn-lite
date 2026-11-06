@@ -328,6 +328,23 @@ do_logs() {
   tail -n 30 /var/log/vpn-lite/events.log 2>/dev/null || true
 }
 
+do_diag() {
+  echo "== forwarding =="
+  echo "ip_forward = $(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)"
+  echo "== default route =="; ip route show default
+  echo "== tunnel devices =="; ip -br addr 2>/dev/null | grep -E '^(vl|ppp|vc)' || echo "(none up)"
+  echo "== nat / mss table (nft) =="; nft list table ip vpnlite 2>&1 | head -30
+  echo "== other firewalls =="
+  command -v ufw >/dev/null && echo "ufw: $(ufw status 2>/dev/null | head -1)"
+  command -v iptables >/dev/null && { echo "iptables FORWARD:"; iptables -S FORWARD 2>/dev/null | head -5; }
+  echo "nft drop rules outside vpnlite: $(nft list ruleset 2>/dev/null | grep -c 'policy drop')"
+  echo "== listening =="; ss -lunpt 2>/dev/null | grep -E 'openvpn|xl2tpd|ocserv|charon|vpn-lite' | awk '{print $1, $5, $7}'
+  echo "== recent errors =="
+  grep -E 'error|nft|tc' /var/log/vpn-lite/events.log 2>/dev/null | tail -8
+  journalctl -u vpn-lite -n 200 --no-pager 2>/dev/null | grep -iE 'error|fail' | tail -8
+  echo "== openvpn log =="; tail -n 12 /var/log/vpn-lite/openvpn-*.log 2>/dev/null
+}
+
 do_uninstall() { # do_uninstall purge(0|1)
   say "stopping panel and its VPN daemons"
   systemctl disable --now vpn-lite 2>/dev/null || true
@@ -380,6 +397,7 @@ while :; do
   echo "   8) Logs"
   echo "   9) Uninstall             (keeps accounts)"
   echo "  10) Uninstall and delete everything"
+  echo "   d) Diagnose network (no traffic / no internet through the VPN)"
   echo "   0) Exit"
   echo
   ask "Choose [0-10]: " ""
@@ -394,6 +412,7 @@ while :; do
     8) do_logs; pause;;
     9) confirm "Uninstall vpn-lite (accounts are kept)?" && { do_uninstall 0; pause; };;
     10) confirm "DELETE vpn-lite AND all accounts?" && { do_uninstall 1; pause; };;
+    d|D) do_diag; pause;;
     0|q|Q|"") exit 0;;
     *) ;;
   esac
