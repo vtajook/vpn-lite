@@ -340,7 +340,7 @@ do_diag() {
   echo "nft drop rules outside vpnlite: $(nft list ruleset 2>/dev/null | grep -c 'policy drop')"
   echo "== listening =="; ss -lunpt 2>/dev/null | grep -E 'openvpn|xl2tpd|ocserv|charon|vpn-lite' | awk '{print $1, $5, $7}'
   echo "== recent errors =="
-  grep -E 'error|nft|tc' /var/log/vpn-lite/events.log 2>/dev/null | tail -8
+  tail -n 15 /var/log/vpn-lite/events.log 2>/dev/null
   journalctl -u vpn-lite -n 200 --no-pager 2>/dev/null | grep -iE 'error|fail' | tail -8
   echo "== openvpn log =="; tail -n 12 /var/log/vpn-lite/openvpn-*.log 2>/dev/null
 }

@@ -259,6 +259,13 @@ func (r *RadiusServer) handleAuth(from *net.UDPAddr, p *radPkt) []byte {
 	user := p.str(attrUserName)
 	nas := p.str(attrNASIdentifier)
 	proto := protoOfNAS(nas)
+	if proto == "" { // client did not send a usable NAS-Identifier: pppd sends Framed-Protocol, ocserv does not
+		if p.get(attrFramedProtocol) != nil {
+			proto = "l2tp"
+		} else {
+			proto = "openconnect"
+		}
+	}
 	reject := func(reason string, mschapIdent int) []byte {
 		Events.Add("reject", proto, user, "%s", reason)
 		resp := &radPkt{Code: radAccessReject, ID: p.ID, Attrs: []radAttr{{attrReplyMessage, []byte(reason)}}}
