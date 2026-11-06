@@ -44,6 +44,8 @@ func main() {
 		err = setup(args)
 	case "import":
 		err = importCmd(args)
+	case "info":
+		err = info(args)
 	case "version":
 		fmt.Println("vpn-lite", version)
 	default:
@@ -250,4 +252,24 @@ func (c *certReloader) get(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 		c.cert, c.mt = &cert, st.ModTime()
 	}
 	return c.cert, nil
+}
+
+// info prints the panel's port and base path without modifying anything (safe while the panel runs).
+func info(args []string) error {
+	fs := flag.NewFlagSet("info", flag.ExitOnError)
+	d := parseDirs(fs)
+	fs.Parse(args)
+	st, err := OpenStore(filepath.Join(d.data, "state.json"))
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+	port := st.st.Global.Port
+	if port == 0 {
+		port = 2096
+	}
+	fmt.Printf("panel port: %d  base path: %s\n", port, st.st.Global.BasePath)
+	return nil
 }
