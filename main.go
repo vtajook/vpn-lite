@@ -68,6 +68,7 @@ func setup(args []string) error {
 	noTLS := fs.Bool("no-tls", false, "do not create a self-signed certificate")
 	crtPath := fs.String("cert", "", "HTTPS certificate file (e.g. Let's Encrypt fullchain.pem)")
 	keyPath := fs.String("key", "", "HTTPS private key file")
+	resetTLS := fs.Bool("reset-tls", false, "forget the configured HTTPS certificate and make a new self-signed one")
 	fs.Parse(args)
 	st, err := OpenStore(filepath.Join(d.data, "state.json"))
 	if err != nil {
@@ -94,6 +95,9 @@ func setup(args []string) error {
 	}
 	if *bind != "" {
 		g.Bind = *bind
+	}
+	if *resetTLS {
+		g.TLSCert, g.TLSKey = "", ""
 	}
 	if *crtPath != "" && *keyPath != "" {
 		g.TLSCert, g.TLSKey = *crtPath, *keyPath

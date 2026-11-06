@@ -45,18 +45,34 @@ case "$(uname -m)" in
   *) echo "unsupported CPU: $(uname -m)" >&2; exit 1;;
 esac
 
+# ---- existing install: clean rewrite -------------------------------------
+# Interactive run without options on an existing install = reinstall everything (packages, binary,
+# service, configs, certificates, login, port) and keep ONLY the data: accounts and services.
+first=0
+[ -f /var/lib/vpn-lite/state.json ] || first=1
+CLEAN=0
+if [ "$first" = 0 ] && [ -r /dev/tty ] && [ -z "$USER_$PASS$PORT$DOMAIN" ]; then first=1; CLEAN=1; fi
+if [ "$CLEAN" = 1 ]; then
+  say "clean reinstall (accounts and services are kept)"
+  systemctl stop vpn-lite 2>/dev/null || true
+  for f in /run/vpn-lite/*.pid; do [ -f "$f" ] && kill "$(cat "$f")" 2>/dev/null || true; done
+  nft delete table ip vpnlite 2>/dev/null || true
+  rm -rf /etc/vpn-lite /run/vpn-lite /etc/swanctl/conf.d/vpn-lite.conf /etc/systemd/system/vpn-lite.service /etc/sysctl.d/99-vpn-lite.conf
+  cp -f /var/lib/vpn-lite/state.json "/var/lib/vpn-lite/state.json.pre-reinstall" 2>/dev/null || true
+fi
+
 # ---- daemons --------------------------------------------------------------
 # Installed WITHOUT starting them: the panel runs its own instances with its own configs,
 # and a distro service must never grab ports 443/1194/1701 behind its back.
 if [ "$DEPS" = 1 ]; then
   need=""
-  command -v openvpn >/dev/null || need="$need openvpn"
-  command -v xl2tpd  >/dev/null || need="$need xl2tpd ppp"
-  command -v ocserv  >/dev/null || need="$need ocserv"
-  command -v swanctl >/dev/null || need="$need strongswan-swanctl charon-systemd"
-  command -v nft     >/dev/null || need="$need nftables"
-  command -v tc      >/dev/null || need="$need iproute2"
-  command -v curl    >/dev/null || need="$need curl ca-certificates"
+  { [ "$CLEAN" = 1 ] || ! command -v openvpn >/dev/null; } && need="$need openvpn"
+  { [ "$CLEAN" = 1 ] || ! command -v xl2tpd  >/dev/null; } && need="$need xl2tpd ppp"
+  { [ "$CLEAN" = 1 ] || ! command -v ocserv  >/dev/null; } && need="$need ocserv"
+  { [ "$CLEAN" = 1 ] || ! command -v swanctl >/dev/null; } && need="$need strongswan-swanctl charon-systemd"
+  { [ "$CLEAN" = 1 ] || ! command -v nft     >/dev/null; } && need="$need nftables"
+  { [ "$CLEAN" = 1 ] || ! command -v tc      >/dev/null; } && need="$need iproute2"
+  { [ "$CLEAN" = 1 ] || ! command -v curl    >/dev/null; } && need="$need curl ca-certificates"
   if [ -n "$need" ]; then
     command -v apt-get >/dev/null || { echo "missing:$need (install them with your package manager, then re-run with --no-deps)" >&2; exit 1; }
     say "installing:$need"
@@ -124,11 +140,6 @@ WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
 
-first=0
-[ -f /var/lib/vpn-lite/state.json ] || first=1
-# Interactive run without options: always walk through the questions again (login, port, domain).
-if [ "$first" = 0 ] && [ -r /dev/tty ] && [ -z "$USER_$PASS$PORT$DOMAIN" ]; then first=1; fi
-
 # Ask for the admin login on a first install / reconfigure (skipped when given as options or when there is no terminal).
 if [ "$first" = 1 ] && [ -r /dev/tty ] && { [ -z "$USER_" ] || [ -z "$PASS" ] || [ -z "$PORT" ]; }; then
   echo
@@ -174,6 +185,7 @@ if [ -n "$DOMAIN" ]; then
 fi
 args=()
 [ -n "$CERT" ] && args+=(-cert "$CERT" -key "$KEY")
+[ "$CLEAN" = 1 ] && args+=(-reset-tls)
 [ -n "$PORT" ] && args+=(-port "$PORT")
 [ -n "$USER_" ] && args+=(-user "$USER_")
 [ -n "$PASS" ] && args+=(-pass "$PASS")
