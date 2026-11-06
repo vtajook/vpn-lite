@@ -126,14 +126,8 @@ systemctl daemon-reload
 
 first=0
 [ -f /var/lib/vpn-lite/state.json ] || first=1
-# Already installed: offer to change login / port / domain (use --reconfigure to skip the question).
-if [ "$first" = 0 ] && [ -r /dev/tty ] && [ -z "$USER_$PASS$PORT$DOMAIN" ]; then
-  if [ "${RECONF:-0}" = 1 ]; then first=1
-  else
-    read -r -p "vpn-lite is already installed. Change admin login / panel port / domain? [y/N]: " ans </dev/tty || true
-    case "$ans" in y|Y|yes) first=1;; esac
-  fi
-fi
+# Interactive run without options: always walk through the questions again (login, port, domain).
+if [ "$first" = 0 ] && [ -r /dev/tty ] && [ -z "$USER_$PASS$PORT$DOMAIN" ]; then first=1; fi
 
 # Ask for the admin login on a first install / reconfigure (skipped when given as options or when there is no terminal).
 if [ "$first" = 1 ] && [ -r /dev/tty ] && { [ -z "$USER_" ] || [ -z "$PASS" ] || [ -z "$PORT" ]; }; then
