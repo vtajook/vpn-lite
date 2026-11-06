@@ -65,7 +65,22 @@ if [ "$DEPS" = 1 ]; then
     # shellcheck disable=SC2086
     apt-get install -y -qq $need
     rm -f /usr/sbin/policy-rc.d
+    # Distro packages enable their own services (ocserv even via a socket on :443, xl2tpd on :1701),
+    # which would grab our ports at the next boot. The panel runs its own instances instead.
+    case "$need" in *ocserv*) systemctl disable --now ocserv.socket ocserv.service >/dev/null 2>&1 || true;; esac
+    case "$need" in *xl2tpd*) systemctl disable --now xl2tpd.service >/dev/null 2>&1 || true;; esac
   fi
+
+  # PPP needs /dev/ppp; minimal cloud kernels (Ubuntu linux-kvm, ...) ship the modules in an extra package.
+  modprobe -a tun ppp_generic ppp_async l2tp_ppp pppol2tp 2>/dev/null || true
+  if [ ! -e /dev/ppp ] && command -v apt-get >/dev/null; then
+    apt-get install -y -qq "linux-modules-extra-$(uname -r)" >/dev/null 2>&1 || true
+    modprobe -a ppp_generic ppp_async l2tp_ppp pppol2tp 2>/dev/null || true
+  fi
+  [ -e /dev/ppp ] || echo "WARNING: /dev/ppp is missing: L2TP will not work on this kernel (OpenVPN and Cisco are unaffected)." >&2
+fi
+if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+  echo "NOTE: ufw is active. Open the VPN ports and allow forwarding: ufw default allow routed" >&2
 fi
 
 # ---- binary ---------------------------------------------------------------
@@ -109,6 +124,29 @@ systemctl daemon-reload
 
 first=0
 [ -f /var/lib/vpn-lite/state.json ] || first=1
+
+# Ask for the admin login on a first install (skipped when given as options or when there is no terminal).
+if [ "$first" = 1 ] && [ -r /dev/tty ] && { [ -z "$USER_" ] || [ -z "$PASS" ] || [ -z "$PORT" ]; }; then
+  echo
+  if [ -z "$USER_" ]; then
+    read -r -p "Admin username [admin]: " USER_ </dev/tty || true
+    USER_="${USER_:-admin}"
+  fi
+  if [ -z "$PASS" ]; then
+    while :; do
+      read -r -s -p "Admin password (min 8 chars, empty = generate one): " PASS </dev/tty || true; echo
+      [ -z "$PASS" ] && break
+      if [ "${#PASS}" -lt 8 ]; then echo "too short, try again"; continue; fi
+      read -r -s -p "Repeat password: " PASS2 </dev/tty || true; echo
+      [ "$PASS" = "$PASS2" ] && break
+      echo "passwords differ, try again"; PASS=""
+    done
+  fi
+  if [ -z "$PORT" ]; then
+    read -r -p "Panel port [2096]: " PORT </dev/tty || true
+    PORT="${PORT:-2096}"
+  fi
+fi
 args=()
 [ -n "$PORT" ] && args+=(-port "$PORT")
 [ -n "$USER_" ] && args+=(-user "$USER_")

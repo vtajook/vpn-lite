@@ -213,12 +213,10 @@ func (a *API) addInbound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.st.mu.Lock()
-	for _, o := range a.st.st.Inbounds {
-		if o.Port == in.Port && o.Protocol == in.Protocol && o.Listen == in.Listen {
-			a.st.mu.Unlock()
-			fail(w, "Port already used by inbound "+itoa(o.ID))
-			return
-		}
+	if msg := a.st.portClashLocked(in); msg != "" {
+		a.st.mu.Unlock()
+		fail(w, msg)
+		return
 	}
 	in.ID = a.st.st.NextInbound
 	a.st.st.NextInbound++
@@ -242,6 +240,12 @@ func (a *API) updateInbound(w http.ResponseWriter, r *http.Request) {
 	}
 	cp := *in // partial update: bind onto the stored row
 	if msg := a.fillInbound(r, &cp, false); msg != "" {
+		a.st.mu.Unlock()
+		fail(w, msg)
+		return
+	}
+	cp.ID = id
+	if msg := a.st.portClashLocked(&cp); msg != "" {
 		a.st.mu.Unlock()
 		fail(w, msg)
 		return
@@ -633,3 +637,49 @@ func (a *API) lastOnline(w http.ResponseWriter, r *http.Request) {
 }
 
 func jsonDecode(resp *http.Response, v any) { json.NewDecoder(resp.Body).Decode(v) }
+
+// portsOf lists the transport/port pairs an inbound listens on, e.g. "udp/1194".
+func portsOf(in *Inbound) []string {
+	p := itoa(in.Port)
+	switch in.Protocol {
+	case "openvpn":
+		var out []string
+		if boolSetting(in.Settings, "udpEnable", true) {
+			out = append(out, "udp/"+p)
+		}
+		if boolSetting(in.Settings, "tcpEnable", true) {
+			out = append(out, "tcp/"+itoa(tcpPort(in)))
+		}
+		return out
+	case "openconnect":
+		return []string{"tcp/" + p, "udp/" + p}
+	case "l2tp":
+		out := []string{"udp/" + p}
+		if p == "1701" && boolSetting(in.Settings, "ipsecEnable", true) {
+			out = append(out, "udp/500", "udp/4500")
+		}
+		return out
+	}
+	return nil
+}
+
+// portClashLocked reports a listen-port conflict between enabled inbounds (same transport, same port).
+func (s *Store) portClashLocked(in *Inbound) string {
+	if !in.Enable {
+		return ""
+	}
+	mine := portsOf(in)
+	for _, o := range s.st.Inbounds {
+		if o.ID == in.ID || !o.Enable {
+			continue
+		}
+		for _, x := range portsOf(o) {
+			for _, y := range mine {
+				if x == y {
+					return "Port " + y + " is already used by inbound " + itoa(o.ID) + " (" + o.Remark + ")"
+				}
+			}
+		}
+	}
+	return ""
+}

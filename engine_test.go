@@ -379,3 +379,20 @@ func TestSingleProtocolAtATime(t *testing.T) {
 		t.Fatalf("mixed protocols under the limit should pass: %q", r.Reason)
 	}
 }
+
+func TestPortClash(t *testing.T) {
+	st := testStore(t)
+	st.st.Inbounds[1] = &Inbound{ID: 1, Enable: true, Port: 443, Protocol: "openvpn", Remark: "ovpn", Settings: map[string]any{"udpEnable": false}}
+	// OpenVPN TCP on 443 blocks Cisco on 443 (tcp), but OpenVPN UDP alone would not
+	if msg := st.portClashLocked(&Inbound{ID: 2, Enable: true, Port: 443, Protocol: "openconnect", Settings: map[string]any{}}); msg == "" {
+		t.Fatal("tcp/443 clash not detected")
+	}
+	if msg := st.portClashLocked(&Inbound{ID: 2, Enable: true, Port: 8443, Protocol: "openconnect", Settings: map[string]any{}}); msg != "" {
+		t.Fatalf("false clash: %s", msg)
+	}
+	// separate TCP port for OpenVPN
+	in := &Inbound{ID: 3, Enable: true, Port: 1194, Protocol: "openvpn", Settings: map[string]any{"separatePorts": true, "tcpPort": float64(8443)}}
+	if got := portsOf(in); len(got) != 2 || got[1] != "tcp/8443" {
+		t.Fatalf("ports %v", got)
+	}
+}

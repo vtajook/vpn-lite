@@ -65,7 +65,6 @@ func ocservConf(in *Inbound, dir, run, radConf string) string {
 	w("cisco-client-compat = true")
 	w("dtls-legacy = true")
 	w("tls-priorities = \"NORMAL:%%SERVER_PRECEDENCE:%%COMPAT:-VERS-SSL3.0:-ARCFOUR-128\"")
-	w("compression = false")
 	w("log-level = 1")
 	return b.String()
 }
