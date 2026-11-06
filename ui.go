@@ -208,11 +208,12 @@ func (a *API) uiSummary(w http.ResponseWriter, r *http.Request) {
 		Members  int    `json:"members"`
 		Online   int    `json:"online"`
 		Domain   string `json:"domain"`
+		PSK      string `json:"psk,omitempty"`
 	}
 	var ins []inb
 	for _, in := range a.st.sortedInbounds() {
 		ins = append(ins, inb{ID: in.ID, Remark: in.Remark, Protocol: in.Protocol, Port: in.Port, Enable: in.Enable,
-			Members: len(a.st.membersLocked(in.ID)), Domain: strings.TrimSpace(strSetting(in.Settings, "connDomain", ""))})
+			Members: len(a.st.membersLocked(in.ID)), Domain: strings.TrimSpace(strSetting(in.Settings, "connDomain", "")), PSK: l2tpPSK(in)})
 	}
 	n := len(a.st.st.Accounts)
 	a.st.mu.RUnlock()
@@ -633,4 +634,12 @@ func readSys() sysInfo {
 	lastRx, lastTx, lastNet = rx, tx, now
 	lastSys = s
 	return s
+}
+
+// l2tpPSK returns the IPsec pre-shared key shown to customers (empty when IPsec is off or not L2TP).
+func l2tpPSK(in *Inbound) string {
+	if in.Protocol != "l2tp" || !boolSetting(in.Settings, "ipsecEnable", true) {
+		return ""
+	}
+	return strings.TrimSpace(strSetting(in.Settings, "ipsecPsk", ""))
 }
