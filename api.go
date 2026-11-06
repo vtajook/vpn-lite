@@ -376,9 +376,13 @@ func (a *API) addClient(w http.ResponseWriter, r *http.Request) {
 	if c.SubID == "" {
 		c.SubID = newSubID()
 	}
+	single := c.SingleProto
+	if !strings.Contains(r.Form.Get("settings"), `"singleProto"`) {
+		single = a.st.st.Global.DefaultSingleProto // the bot does not send it: use the panel default
+	}
 	acc := &Account{Email: email, Username: user, Password: c.Password, SubID: c.SubID, Enable: c.Enable,
 		TotalGB: c.TotalGB, ExpiryTime: c.ExpiryTime, LimitIP: c.LimitIP, TgID: c.TgID, Comment: c.Comment,
-		Reset: c.Reset, SpeedDown: c.SpeedDown, SpeedUp: c.SpeedUp, Inbounds: ids, CreatedAt: nowMs()}
+		Reset: c.Reset, SpeedDown: c.SpeedDown, SpeedUp: c.SpeedUp, SingleProto: single, Inbounds: ids, CreatedAt: nowMs()}
 	a.st.st.Accounts[ekey(email)] = acc
 	a.st.touch()
 	a.st.mu.Unlock()
@@ -462,6 +466,7 @@ func (a *API) updateClient(w http.ResponseWriter, r *http.Request) {
 	acc.TgID, acc.Comment, acc.Reset = c.TgID, c.Comment, c.Reset
 	speedChanged := acc.SpeedDown != c.SpeedDown || acc.SpeedUp != c.SpeedUp
 	acc.SpeedDown, acc.SpeedUp = c.SpeedDown, c.SpeedUp
+	acc.SingleProto = c.SingleProto
 	if c.SubID != "" {
 		acc.SubID = c.SubID
 	}

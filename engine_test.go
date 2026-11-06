@@ -327,3 +327,55 @@ func TestBotAPIContract(t *testing.T) {
 		t.Fatalf("ovpn without certs should fail: %v", m)
 	}
 }
+
+func TestSingleProtocolAtATime(t *testing.T) {
+	st := testStore(t)
+	seed(st) // alice on openvpn (1) and l2tp (2)
+	st.st.Accounts["alice@x"].SingleProto = true
+	st.st.Accounts["alice@x"].LimitIP = 2
+	pass := func(stored string) bool { return stored == "secret" }
+	old := func(id string, proto string, ageSec int64) {
+		Sessions.Add(&Session{ID: id, Email: "alice@x", Proto: proto, Start: nowMs() - ageSec*1000, LastSeen: nowMs()})
+	}
+	// two OpenVPN sessions (udp + tcp are one protocol) are fine under limit 2 ...
+	old("a", "openvpn-udp", 600)
+	old("b", "openvpn-tcp", 600)
+	if r := st.AuthorizeFn(1, "alice", pass, nil); r.Reason != "" && !strings.Contains(r.Reason, "limit") {
+		t.Fatalf("unexpected %q", r.Reason)
+	}
+	// ... but an L2TP login must push the OpenVPN sessions out, not coexist with them
+	Sessions.mu.Lock()
+	Sessions.byID = map[string]*Session{}
+	Sessions.mu.Unlock()
+	old("a", "openvpn-udp", 600)
+	old("b", "openvpn-tcp", 600)
+	killed := make(chan string, 4)
+	for _, id := range []string{"a", "b"} {
+		id := id
+		Sessions.byID[id].Kill = func() { killed <- id }
+	}
+	r := st.AuthorizeFn(2, "alice", pass, nil)
+	if !r.OK {
+		t.Fatalf("l2tp login refused: %q", r.Reason)
+	}
+	for i := 0; i < 2; i++ {
+		select {
+		case <-killed:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("expected both openvpn sessions evicted, got %d", i)
+		}
+	}
+	// a fresh other-protocol session inside the grace window blocks the new protocol
+	Sessions.mu.Lock()
+	Sessions.byID = map[string]*Session{}
+	Sessions.mu.Unlock()
+	old("c", "l2tp", 5)
+	if r := st.AuthorizeFn(1, "alice", pass, nil); r.OK || !strings.Contains(r.Reason, "another protocol") {
+		t.Fatalf("young session on another protocol must block: %+v", r)
+	}
+	// without the flag, protocols mix freely up to the device limit
+	st.st.Accounts["alice@x"].SingleProto = false
+	if r := st.AuthorizeFn(1, "alice", pass, nil); !r.OK {
+		t.Fatalf("mixed protocols under the limit should pass: %q", r.Reason)
+	}
+}

@@ -10,19 +10,20 @@ import (
 )
 
 type clientJSON struct {
-	ID         string `json:"id"`
-	Email      string `json:"email"`
-	Enable     bool   `json:"enable"`
-	LimitIP    int    `json:"limitIp"`
-	TotalGB    int64  `json:"totalGB"`
-	ExpiryTime int64  `json:"expiryTime"`
-	TgID       int64  `json:"tgId"`
-	SubID      string `json:"subId"`
-	Comment    string `json:"comment"`
-	Reset      int    `json:"reset"`
-	Password   string `json:"password"`
-	SpeedDown  int    `json:"speedLimitDown"`
-	SpeedUp    int    `json:"speedLimitUp"`
+	ID          string `json:"id"`
+	Email       string `json:"email"`
+	Enable      bool   `json:"enable"`
+	LimitIP     int    `json:"limitIp"`
+	TotalGB     int64  `json:"totalGB"`
+	ExpiryTime  int64  `json:"expiryTime"`
+	TgID        int64  `json:"tgId"`
+	SubID       string `json:"subId"`
+	Comment     string `json:"comment"`
+	Reset       int    `json:"reset"`
+	Password    string `json:"password"`
+	SpeedDown   int    `json:"speedLimitDown"`
+	SpeedUp     int    `json:"speedLimitUp"`
+	SingleProto bool   `json:"singleProto"`
 }
 
 type trafficJSON struct {
@@ -64,7 +65,7 @@ func (a *Account) client() clientJSON {
 	return clientJSON{ID: a.Username, Email: a.Email, Enable: a.Enable, LimitIP: a.LimitIP,
 		TotalGB: a.TotalGB, ExpiryTime: a.ExpiryTime, TgID: a.TgID, SubID: a.SubID,
 		Comment: a.Comment, Reset: a.Reset, Password: a.Password,
-		SpeedDown: a.SpeedDown, SpeedUp: a.SpeedUp}
+		SpeedDown: a.SpeedDown, SpeedUp: a.SpeedUp, SingleProto: a.SingleProto}
 }
 
 func (a *Account) traffic() trafficJSON {

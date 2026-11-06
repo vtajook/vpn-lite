@@ -27,7 +27,7 @@ th{font-size:12px;color:var(--mu);font-weight:600}tr:hover td{background:rgba(12
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-inline-end:5px}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto;z-index:9}
 .modal .card{width:min(560px,100%)}.row{display:flex;gap:10px;margin-bottom:10px;align-items:center;flex-wrap:wrap}.row label{width:120px;color:var(--mu);font-size:13px}
-.row input,.row select{flex:1;min-width:120px}.bar-sel{background:var(--pr);color:#fff;padding:8px 12px;border-radius:8px;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row input,.row select{flex:1;min-width:120px}.row input[type=checkbox]{flex:none;min-width:0;width:auto}.bar-sel{background:var(--pr);color:#fff;padding:8px 12px;border-radius:8px;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .toast{position:fixed;bottom:18px;inset-inline-end:18px;background:#111827;color:#fff;padding:10px 16px;border-radius:8px;z-index:20}.toast.er{background:var(--er)}
 .login{max-width:340px;margin:12vh auto}.login input{width:100%;margin-bottom:10px}
 .pg{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:10px}.mu{color:var(--mu)}
@@ -54,7 +54,7 @@ const T = {
   chpw:"Change password",oldpw:"Current password",newpw:"New password (8+)",backup:"Download backup",restart:"Restart panel",tls:"HTTPS certificate path",tlsk:"HTTPS key path",
   basep:"Base path",adv:"Advanced settings (JSON)",lang:"فارسی",theme:"Theme",logout:"Sign out",sort:"Sort",name:"Name",lastseen:"Last seen",today:"Used today",dns:"DNS",mtu:"MTU",
   ipsec:"IPsec PSK (phones)",pool:"Tunnel pool",udp:"UDP",tcp:"TCP",tcpport:"TCP port",ext:"Server address for clients",sub:"Config",listen:"Listen address",
-  full:"Device limit reached",none:"Nothing here yet"},
+  full:"Device limit reached",none:"Nothing here yet",single:"One protocol at a time",singleh:"The account is served on all selected protocols, but can be connected through only one of them at a time.",defsingle:"Default for accounts created by the bot / API"},
  fa:{dash:"داشبورد",accounts:"اکانت‌ها",inbounds:"سرویس‌ها",online:"آنلاین",logs:"لاگ",settings:"تنظیمات",login:"ورود",user:"نام کاربری",pass:"رمز",
   add:"افزودن اکانت",bulkc:"ساخت گروهی",search:"جستجو…",all:"همه",active:"فعال",expired:"منقضی",depleted:"تمام‌شده",disabled:"غیرفعال",save:"ذخیره",cancel:"انصراف",
   del:"حذف",edit:"ویرایش",reset:"ریست حجم",kick:"قطع",enable:"فعال",disable:"غیرفعال",extend:"تمدید",used:"مصرف",expiry:"انقضا",devices:"دستگاه",speed:"سرعت",
@@ -66,7 +66,7 @@ const T = {
   chpw:"تغییر رمز",oldpw:"رمز فعلی",newpw:"رمز جدید (حداقل ۸)",backup:"دانلود بکاپ",restart:"ری‌استارت پنل",tls:"مسیر گواهی HTTPS",tlsk:"مسیر کلید HTTPS",
   basep:"مسیر پایه",adv:"تنظیمات پیشرفته (JSON)",lang:"English",theme:"تم",logout:"خروج",sort:"مرتب‌سازی",name:"نام",lastseen:"آخرین اتصال",today:"مصرف امروز",dns:"DNS",mtu:"MTU",
   ipsec:"کلید IPsec (گوشی)",pool:"محدوده تونل",udp:"UDP",tcp:"TCP",tcpport:"پورت TCP",ext:"آدرس سرور برای کاربران",sub:"کانفیگ",listen:"آدرس شنود",
-  full:"سقف دستگاه پر است",none:"چیزی نیست"}
+  full:"سقف دستگاه پر است",none:"چیزی نیست",single:"فقط با یک پروتکل همزمان",singleh:"اکانت روی همه‌ی پروتکل‌های انتخاب‌شده فعال است ولی هر لحظه فقط با یکی از آن‌ها می‌شود وصل بود.",defsingle:"پیش‌فرض برای اکانت‌هایی که ربات / API می‌سازد"}
 };
 let lang = localStorage.getItem("lang") || "fa", theme = localStorage.getItem("theme") || "light";
 const t = k => (T[lang] && T[lang][k]) || T.en[k] || k;
@@ -143,7 +143,7 @@ async function pAccounts(c){
    r.items.map(a=>{const pct=a.total?Math.min(100,(a.up+a.down)*100/a.total):0;
     return h("tr",{},h("td",{},h("input",{type:"checkbox",checked:AS.sel.has(a.email),onchange:e=>{e.target.checked?AS.sel.add(a.email):AS.sel.delete(a.email);drawBulk()}})),
      h("td",{},h("b",{},a.email),a.comment?h("div",{class:"mu"},a.comment):null),
-     h("td",{},a.inbounds.map(i=>h("span",{class:"tag"},names[i]||i))),
+     h("td",{},a.inbounds.map(i=>h("span",{class:"tag"},names[i]||i)),a.singleProto&&a.inbounds.length>1?h("span",{class:"tag",title:t("single")},"①"):null),
      h("td",{},h("div",{class:"num"},fmtB(a.up+a.down)+" / "+(a.total?fmtB(a.total):t("unl"))),a.total?h("div",{class:"bar"+(pct>90?" hi":"")},h("i",{style:"width:"+pct+"%"})):null),
      h("td",{},fmtExp(a.expiry)),
      h("td",{class:"mu"},h("span",{class:"num"},(a.speedDown?"↓"+a.speedDown:"")+" "+(a.speedUp?"↑"+a.speedUp:"")||"-")),
@@ -163,16 +163,16 @@ async function pAccounts(c){
 
 function modal(title,content,actions){const m=h("div",{class:"modal",onclick:e=>e.target===m&&m.remove()},h("div",{class:"card"},h("h3",{style:"margin-top:0"},title),content,h("div",{class:"row",style:"margin:14px 0 0;justify-content:flex-end"},actions)));document.body.append(m);return m}
 const field=(l,el)=>h("div",{class:"row"},h("label",{},l),el);
-function accountModal(a){const isNew=!a;a=a||{email:"",username:"",password:randpw(),enable:true,total:0,expiry:0,limitIp:0,speedDown:0,speedUp:0,reset:0,comment:"",inbounds:[],subId:""};
+function accountModal(a){const isNew=!a;a=a||{email:"",username:"",password:randpw(),enable:true,total:0,expiry:0,limitIp:0,speedDown:0,speedUp:0,reset:0,comment:"",inbounds:[],subId:"",singleProto:true};
  const f={email:h("input",{value:a.email,disabled:!isNew}),pass:h("input",{value:a.password}),gb:h("input",{type:"number",step:"any",value:a.total?+(a.total/1073741824).toFixed(3):0}),
   days:h("input",{type:"number",value:0,placeholder:isNew?"":"+"}),limit:h("input",{type:"number",value:a.limitIp}),dn:h("input",{type:"number",value:a.speedDown}),up:h("input",{type:"number",value:a.speedUp}),
-  reset:h("input",{type:"number",value:a.reset}),comment:h("input",{value:a.comment}),en:h("input",{type:"checkbox",checked:a.enable})};
+  reset:h("input",{type:"number",value:a.reset}),comment:h("input",{value:a.comment}),en:h("input",{type:"checkbox",checked:a.enable}),single:h("input",{type:"checkbox",checked:a.singleProto})};
  const boxes=inboundsCache.map(i=>[i,h("input",{type:"checkbox",checked:a.inbounds.includes(i.id)})]);
  const exp=h("div",{class:"mu"},isNew?"":t("expiry")+": "+(a.expiry?fmtDate(a.expiry):t("unl")));
  const m=modal(isNew?t("add"):t("edit")+" — "+a.email,h("div",{},field(t("email"),f.email),field(t("pass"),f.pass),
   field(t("protocols"),h("div",{style:"flex:1"},boxes.map(([i,b])=>h("label",{style:"display:block;width:auto;color:inherit"},b," ",i.remark||i.protocol," ",h("span",{class:"tag"},i.protocol))))),
   field(t("total"),f.gb),field(t("days"),h("div",{style:"flex:1"},f.days,exp)),field(t("limit"),f.limit),field(t("down"),f.dn),field(t("up"),f.up),field(t("resetd"),f.reset),field(t("comment"),f.comment),
-  field(t("enable"),f.en)),[
+  field(t("single"),h("div",{style:"flex:1"},f.single,h("div",{class:"mu"},t("singleh")))),field(t("enable"),f.en)),[
   !isNew&&h("button",{class:"btn d",onclick:async()=>{if(!confirm(t("confirm")))return;await bulkOne("delete",a.email);m.remove()}},t("del")),
   !isNew&&h("button",{class:"btn",onclick:async()=>{await bulkOne("reset",a.email);toast(t("saved"))}},t("reset")),
   !isNew&&h("button",{class:"btn",onclick:async()=>{await post("panel/ui/kick?email="+encodeURIComponent(a.email));toast(t("saved"))}},t("kick")),
@@ -181,7 +181,7 @@ function accountModal(a){const isNew=!a;a=a||{email:"",username:"",password:rand
    const ids=boxes.filter(([i,b])=>b.checked).map(([i])=>i.id);if(!ids.length){toast(t("protocols"),1);return}
    let expiry=a.expiry;const d=+f.days.value;if(isNew){expiry=d>0?Date.now()+d*864e5:0}else if(d!==0){const base=Math.max(a.expiry||0,Date.now());expiry=d>0?base+d*864e5:0}
    const client={id:a.username||a.email||f.email.value.trim(),email:isNew?f.email.value.trim():a.email,enable:f.en.checked,limitIp:+f.limit.value||0,totalGB:Math.round((+f.gb.value||0)*1073741824),
-    expiryTime:expiry,tgId:0,subId:a.subId||"",comment:f.comment.value,reset:+f.reset.value||0,password:f.pass.value.trim(),speedLimitDown:+f.dn.value||0,speedLimitUp:+f.up.value||0};
+    expiryTime:expiry,tgId:0,subId:a.subId||"",comment:f.comment.value,reset:+f.reset.value||0,password:f.pass.value.trim(),speedLimitDown:+f.dn.value||0,speedLimitUp:+f.up.value||0,singleProto:f.single.checked};
    if(isNew)client.id=client.email;
    const p=new URLSearchParams();p.set("id",ids[0]);p.set("settings",JSON.stringify({clients:[client]}));ids.forEach(i=>p.append("inboundIds",i));
    const r=await fetch(BASE+"panel/api/inbounds/"+(isNew?"addClient":"updateClient/"+encodeURIComponent(a.password)),{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:p.toString()});
@@ -192,13 +192,13 @@ function infoModal(a){const host=location.hostname;const txt=`user: ${a.username
  const m=modal(a.email,h("div",{},h("pre",{},txt),h("div",{class:"mu"},a.inbounds.map(i=>{const x=inboundsCache.find(q=>q.id===i);return x?x.remark+" ("+x.protocol+":"+x.port+")":i}).join(" · ")),
   a.inbounds.filter(i=>(inboundsCache.find(q=>q.id===i)||{}).protocol==="openvpn").map(i=>h("div",{style:"margin-top:8px"},"OpenVPN: ",h("a",{href:BASE+"panel/api/inbounds/"+i+"/ovpn/udp"},"UDP .ovpn")," ",h("a",{href:BASE+"panel/api/inbounds/"+i+"/ovpn/tcp"},"TCP .ovpn")))),
   [h("button",{class:"btn",onclick:()=>{navigator.clipboard&&navigator.clipboard.writeText(txt);toast(t("copy"))}},t("copy")),h("button",{class:"btn",onclick:()=>m.remove()},t("cancel"))])}
-function bulkCreateModal(){const f={prefix:h("input",{value:"u"}),count:h("input",{type:"number",value:10}),gb:h("input",{type:"number",value:0}),days:h("input",{type:"number",value:30}),limit:h("input",{type:"number",value:0}),dn:h("input",{type:"number",value:0}),up:h("input",{type:"number",value:0})};
+function bulkCreateModal(){const f={prefix:h("input",{value:"u"}),count:h("input",{type:"number",value:10}),gb:h("input",{type:"number",value:0}),days:h("input",{type:"number",value:30}),limit:h("input",{type:"number",value:0}),dn:h("input",{type:"number",value:0}),up:h("input",{type:"number",value:0}),single:h("input",{type:"checkbox",checked:true})};
  const boxes=inboundsCache.map(i=>[i,h("input",{type:"checkbox"})]);
  const m=modal(t("bulkc"),h("div",{},field(t("prefix"),f.prefix),field(t("count"),f.count),field(t("protocols"),h("div",{style:"flex:1"},boxes.map(([i,b])=>h("label",{style:"display:block;width:auto;color:inherit"},b," ",i.remark||i.protocol)))),
-  field(t("total"),f.gb),field(t("days"),f.days),field(t("limit"),f.limit),field(t("down"),f.dn),field(t("up"),f.up)),[
+  field(t("total"),f.gb),field(t("days"),f.days),field(t("limit"),f.limit),field(t("down"),f.dn),field(t("up"),f.up),field(t("single"),f.single)),[
   h("button",{class:"btn",onclick:()=>m.remove()},t("cancel")),
   h("button",{class:"btn p",onclick:async()=>{const ids=boxes.filter(([i,b])=>b.checked).map(([i])=>i.id);if(!ids.length){toast(t("protocols"),1);return}
-   const r=await post("panel/ui/bulkCreate",{prefix:f.prefix.value,count:+f.count.value,inbounds:ids,gb:+f.gb.value,days:+f.days.value,limitIp:+f.limit.value,speedDown:+f.dn.value,speedUp:+f.up.value});
+   const r=await post("panel/ui/bulkCreate",{prefix:f.prefix.value,count:+f.count.value,inbounds:ids,gb:+f.gb.value,days:+f.days.value,limitIp:+f.limit.value,speedDown:+f.dn.value,speedUp:+f.up.value,singleProto:f.single.checked});
    m.remove();const txt=r.map(x=>x.User+"\t"+x.Pass).join("\n");const m2=modal(t("created")+" ("+r.length+")",h("pre",{},txt),[h("button",{class:"btn",onclick:()=>{navigator.clipboard&&navigator.clipboard.writeText(txt);toast(t("copy"))}},t("copy")),h("button",{class:"btn p",onclick:()=>{m2.remove();render()}},"OK")])}},t("save"))])}
 
 /* ---------- inbounds ---------- */
@@ -249,11 +249,11 @@ async function pLogs(c){let email="",kind="";
 /* ---------- settings ---------- */
 async function pSettings(c){const s=await call("panel/ui/settings");const g=s.global;
  const f={st:h("select",{},[["evict",t("evict")],["reject",t("reject")]].map(([v,l])=>h("option",{value:v,selected:g.limitStrategy===v},l))),gr:h("input",{type:"number",value:g.evictGraceSec}),
-  bp:h("input",{value:g.basePath}),tc:h("input",{value:g.tlsCert||""}),tk:h("input",{value:g.tlsKey||""}),sm:h("input",{type:"number",value:g.sessionMinutes})};
+  bp:h("input",{value:g.basePath}),tc:h("input",{value:g.tlsCert||""}),tk:h("input",{value:g.tlsKey||""}),sm:h("input",{type:"number",value:g.sessionMinutes}),ds:h("input",{type:"checkbox",checked:g.defaultSingleProto})};
  const pw={u:h("input",{value:s.admin}),o:h("input",{type:"password"}),n:h("input",{type:"password"})};
  c.replaceChildren(h("div",{class:"top"},h("h2",{},t("settings"))),
-  h("div",{class:"card",style:"margin-bottom:12px"},field(t("strategy"),f.st),field(t("grace"),f.gr),field("session (min)",f.sm),field(t("basep"),f.bp),field(t("tls"),f.tc),field(t("tlsk"),f.tk),
-   h("button",{class:"btn p",onclick:async()=>{await post("panel/ui/settings",{limitStrategy:f.st.value,evictGraceSec:+f.gr.value,basePath:f.bp.value,tlsCert:f.tc.value,tlsKey:f.tk.value,sessionMinutes:+f.sm.value});toast(t("saved"))}},t("save"))),
+  h("div",{class:"card",style:"margin-bottom:12px"},field(t("strategy"),f.st),field(t("grace"),f.gr),field(t("defsingle"),f.ds),field("session (min)",f.sm),field(t("basep"),f.bp),field(t("tls"),f.tc),field(t("tlsk"),f.tk),
+   h("button",{class:"btn p",onclick:async()=>{await post("panel/ui/settings",{limitStrategy:f.st.value,evictGraceSec:+f.gr.value,defaultSingleProto:f.ds.checked,basePath:f.bp.value,tlsCert:f.tc.value,tlsKey:f.tk.value,sessionMinutes:+f.sm.value});toast(t("saved"))}},t("save"))),
   h("div",{class:"card",style:"margin-bottom:12px"},h("h3",{style:"margin-top:0"},t("chpw")),field(t("user"),pw.u),field(t("oldpw"),pw.o),field(t("newpw"),pw.n),
    h("button",{class:"btn p",onclick:async()=>{await post("panel/ui/password",{user:pw.u.value,old:pw.o.value,new:pw.n.value});toast(t("saved"));pw.o.value=pw.n.value=""}},t("save"))),
   h("div",{class:"card"},h("a",{class:"btn",href:BASE+"panel/ui/backup"},t("backup"))," ",h("button",{class:"btn d",onclick:async()=>{if(!confirm(t("confirm")))return;await post("panel/ui/restart");toast("…");setTimeout(()=>location.reload(),3500)}},t("restart"))))}

@@ -47,9 +47,12 @@ type Account struct {
 	LastOnline int64  `json:"lastOnline"`
 	SpeedDown  int    `json:"speedDown"` // KB/s, 0 = unlimited (server -> client)
 	SpeedUp    int    `json:"speedUp"`   // KB/s, 0 = unlimited (client -> server)
-	LastReset  int64  `json:"lastReset"` // unix ms of the last periodic traffic reset
-	Inbounds   []int  `json:"inbounds"`
-	CreatedAt  int64  `json:"createdAt"`
+	// SingleProto: although the account is served on several protocols, only ONE protocol
+	// may have live sessions at a time (OpenVPN udp+tcp count as one protocol).
+	SingleProto bool  `json:"singleProto"`
+	LastReset   int64 `json:"lastReset"` // unix ms of the last periodic traffic reset
+	Inbounds    []int `json:"inbounds"`
+	CreatedAt   int64 `json:"createdAt"`
 }
 
 type Admin struct {
@@ -79,8 +82,10 @@ type GlobalSettings struct {
 	// a newer-than-grace oldest session turns the login into a reject (no ping-pong).
 	LimitStrategy string `json:"limitStrategy"`
 	EvictGraceSec int    `json:"evictGraceSec"`
-	TLSCert       string `json:"tlsCert"` // panel HTTPS certificate path (empty = HTTP or self-signed)
-	TLSKey        string `json:"tlsKey"`
+	// DefaultSingleProto applies to accounts created through the API without an explicit value (the bot).
+	DefaultSingleProto bool   `json:"defaultSingleProto"`
+	TLSCert            string `json:"tlsCert"` // panel HTTPS certificate path (empty = HTTP or self-signed)
+	TLSKey             string `json:"tlsKey"`
 }
 
 type Store struct {

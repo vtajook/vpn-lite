@@ -94,6 +94,7 @@ type accountRow struct {
 	LimitIP    int    `json:"limitIp"`
 	SpeedDown  int    `json:"speedDown"`
 	SpeedUp    int    `json:"speedUp"`
+	Single     bool   `json:"singleProto"`
 	Reset      int    `json:"reset"`
 	Comment    string `json:"comment"`
 	Online     int    `json:"online"`
@@ -161,7 +162,7 @@ func (a *API) uiAccounts(w http.ResponseWriter, r *http.Request) {
 		}
 		rows = append(rows, accountRow{Email: acc.Email, Username: acc.Username, Password: acc.Password, SubID: acc.SubID,
 			Inbounds: append([]int(nil), acc.Inbounds...), Enable: acc.Enable, Total: acc.TotalGB, Up: acc.Up, Down: acc.Down,
-			Expiry: acc.ExpiryTime, LimitIP: acc.LimitIP, SpeedDown: acc.SpeedDown, SpeedUp: acc.SpeedUp, Reset: acc.Reset,
+			Expiry: acc.ExpiryTime, LimitIP: acc.LimitIP, SpeedDown: acc.SpeedDown, SpeedUp: acc.SpeedUp, Single: acc.SingleProto, Reset: acc.Reset,
 			Comment: acc.Comment, Online: o, LastOnline: acc.LastOnline, Status: st})
 	}
 	a.st.mu.RUnlock()
@@ -350,6 +351,7 @@ func (a *API) uiBulkCreate(w http.ResponseWriter, r *http.Request) {
 		SpeedDown int     `json:"speedDown"`
 		SpeedUp   int     `json:"speedUp"`
 		PassLen   int     `json:"passLen"`
+		Single    bool    `json:"singleProto"`
 	}
 	if json.NewDecoder(r.Body).Decode(&req) != nil || req.Count < 1 || req.Count > 1000 || len(req.Inbounds) == 0 {
 		fail(w, "bad request")
@@ -400,7 +402,7 @@ func (a *API) uiBulkCreate(w http.ResponseWriter, r *http.Request) {
 		pw := randPass(req.PassLen)
 		a.st.st.Accounts[ekey(name)] = &Account{Email: name, Username: name, Password: pw, SubID: newSubID(), Enable: true,
 			TotalGB: int64(req.GB * 1073741824), ExpiryTime: exp, LimitIP: req.LimitIP, SpeedDown: req.SpeedDown,
-			SpeedUp: req.SpeedUp, Inbounds: append([]int(nil), req.Inbounds...), CreatedAt: nowMs()}
+			SpeedUp: req.SpeedUp, SingleProto: req.Single, Inbounds: append([]int(nil), req.Inbounds...), CreatedAt: nowMs()}
 		out = append(out, made{name, pw})
 	}
 	a.st.touch()
@@ -445,6 +447,7 @@ func (a *API) uiSetSettings(w http.ResponseWriter, r *http.Request) {
 	a.st.mu.Lock()
 	cur := &a.st.st.Global
 	cur.LimitStrategy, cur.EvictGraceSec = g.LimitStrategy, g.EvictGraceSec
+	cur.DefaultSingleProto = g.DefaultSingleProto
 	if g.SessionMinutes > 0 {
 		cur.SessionMinutes = g.SessionMinutes
 	}

@@ -100,6 +100,8 @@ type AuthResult struct {
 	Reason  string
 	Account *Account
 	Email   string // copied under the store lock
+	Family  string // protocol family of the inbound: openvpn, l2tp, openconnect
+	Single  bool   // the account may use only one protocol at a time
 }
 
 func intSetting(m map[string]any, k string, def int) int {
@@ -148,7 +150,7 @@ func (s *Store) checkAccount(inboundID int, user string, verify func(stored stri
 	if acc == nil || !verify(acc.Password) {
 		return AuthResult{Reason: "bad credentials"}, 0
 	}
-	res := AuthResult{Account: acc, Email: acc.Email}
+	res := AuthResult{Account: acc, Email: acc.Email, Family: in.Protocol, Single: acc.SingleProto}
 	switch {
 	case !hasInt(acc.Inbounds, inboundID):
 		res.Reason = "not a member of this inbound"
@@ -184,22 +186,43 @@ func (s *Store) AuthorizeFn(inboundID int, user string, verify func(stored strin
 	Sessions.mu.Lock()
 	live := Sessions.liveOf(email)
 	var evict []*Session
-	if limit > 0 && len(live) >= limit {
+	deny := func(why string) AuthResult {
+		Sessions.mu.Unlock()
+		res.Reason = why
+		return res
+	}
+	// canEvict applies the panel policy to one existing session.
+	canEvict := func(s *Session) string {
 		if g.LimitStrategy == "reject" {
-			Sessions.mu.Unlock()
-			res.Reason = "device limit reached"
-			return res
+			return "device limit reached"
 		}
-		// evict oldest, but never a session younger than the grace window:
-		// two devices fighting over one account must not keep kicking each other.
-		need := len(live) - limit + 1
-		for i := 0; i < need; i++ {
-			if now-live[i].Start < int64(g.EvictGraceSec)*1000 {
-				Sessions.mu.Unlock()
-				res.Reason = "device limit reached (other device just connected)"
-				return res
+		if now-s.Start < int64(g.EvictGraceSec)*1000 {
+			return "device limit reached (other device just connected)"
+		}
+		return ""
+	}
+	same := live
+	if res.Single {
+		// one protocol at a time: sessions on any OTHER protocol are in the way
+		same = nil
+		for _, s := range live {
+			if protoFamily(s.Proto) == res.Family {
+				same = append(same, s)
+			} else if why := canEvict(s); why != "" {
+				return deny("account is connected on another protocol; " + why)
+			} else {
+				evict = append(evict, s)
 			}
-			evict = append(evict, live[i])
+		}
+	}
+	// device cap among the sessions that remain relevant: evict the oldest, but never a
+	// session younger than the grace window, so two devices cannot kick each other forever.
+	if limit > 0 && len(same) >= limit {
+		for i := 0; i < len(same)-limit+1; i++ {
+			if why := canEvict(same[i]); why != "" {
+				return deny(why)
+			}
+			evict = append(evict, same[i])
 		}
 	}
 	for _, e := range evict {
@@ -305,4 +328,12 @@ func (t *SessionTable) Touch(id string, up, down int64) (dUp, dDown int64, s *Se
 	}
 	s.Up, s.Down, s.LastSeen = up, down, nowMs()
 	return dUp, dDown, s
+}
+
+// protoFamily maps a session protocol to its family: "openvpn-udp" and "openvpn-tcp" are both "openvpn".
+func protoFamily(p string) string {
+	if i := strings.IndexByte(p, '-'); i > 0 {
+		return p[:i]
+	}
+	return p
 }
