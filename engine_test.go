@@ -448,6 +448,12 @@ func TestBackupRestoreAndImport(t *testing.T) {
 	if r["success"] != true {
 		t.Fatalf("addClient: %v", r)
 	}
+	st.mu.Lock()
+	a0 := st.st.Accounts["a@x"]
+	a0.TotalGB, a0.ExpiryTime, a0.Up, a0.Down, a0.AllTime, a0.Enable, a0.LimitIP, a0.SpeedDown = 5<<30, 1893456000000, 111, 222, 333, false, 3, 500
+	st.st.Inbounds[1].Enable = false
+	st.touch()
+	st.mu.Unlock()
 	// backup
 	resp, err := c.Get(ts.URL + "/panel/ui/backup")
 	if err != nil {
@@ -474,6 +480,13 @@ func TestBackupRestoreAndImport(t *testing.T) {
 	_, haveIn := st.st.Inbounds[1]
 	user := st.st.Admin.User
 	st.mu.RUnlock()
+	st.mu.RLock()
+	ra, ri := st.st.Accounts["a@x"], st.st.Inbounds[1]
+	st.mu.RUnlock()
+	if ra == nil || ri == nil || ra.TotalGB != 5<<30 || ra.ExpiryTime != 1893456000000 || ra.Up != 111 || ra.Down != 222 ||
+		ra.AllTime != 333 || ra.Enable || ra.LimitIP != 3 || ra.SpeedDown != 500 || ri.Enable || ri.Port != 1194 {
+		t.Fatalf("restore changed data: account=%+v inbound=%+v", ra, ri)
+	}
 	if !haveAcc || !haveIn || user != "admin" {
 		t.Fatalf("after restore: account=%v inbound=%v admin=%q", haveAcc, haveIn, user)
 	}
@@ -510,5 +523,41 @@ func TestImportFromOldPanel(t *testing.T) {
 		if in.Port != 11194 || in.Enable {
 			t.Fatalf("inbound should be shifted and disabled: port=%d enable=%v", in.Port, in.Enable)
 		}
+	}
+}
+
+func TestTelegramBackup(t *testing.T) {
+	var gotChat, gotName string
+	var gotSize int
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/botTOKEN/sendDocument") {
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+		r.ParseMultipartForm(32 << 20)
+		gotChat = r.FormValue("chat_id")
+		if f, h, err := r.FormFile("document"); err == nil {
+			gotName = h.Filename
+			b, _ := io.ReadAll(f)
+			gotSize = len(b)
+		}
+		w.Write([]byte(`{"ok":true}`))
+	}))
+	defer fake.Close()
+	old := tgAPI
+	tgAPI = fake.URL
+	defer func() { tgAPI = old }()
+	st := testStore(t)
+	if err := st.SendBackup(); err == nil {
+		t.Fatal("expected an error without token/chat")
+	}
+	st.mu.Lock()
+	st.st.Global.TgToken, st.st.Global.TgChat = "TOKEN", "42"
+	st.touch()
+	st.mu.Unlock()
+	if err := st.SendBackup(); err != nil {
+		t.Fatal(err)
+	}
+	if gotChat != "42" || !strings.HasPrefix(gotName, "vpn-lite-") || gotSize < 50 {
+		t.Fatalf("bad upload: chat=%q name=%q size=%d", gotChat, gotName, gotSize)
 	}
 }

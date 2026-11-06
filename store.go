@@ -86,6 +86,10 @@ type GlobalSettings struct {
 	DefaultSingleProto bool   `json:"defaultSingleProto"`
 	TLSCert            string `json:"tlsCert"` // panel HTTPS certificate path (empty = HTTP or self-signed)
 	TLSKey             string `json:"tlsKey"`
+	// Scheduled backup to a Telegram bot.
+	TgToken       string `json:"tgToken"`
+	TgChat        string `json:"tgChat"`
+	TgBackupHours int    `json:"tgBackupHours"` // 0 = off
 }
 
 type Store struct {

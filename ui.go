@@ -80,6 +80,7 @@ func (a *API) uiRoutes(mux *http.ServeMux) {
 	u("GET", "/backup", a.uiBackup)
 	u("POST", "/restart", a.uiRestart)
 	u("POST", "/restore", a.uiRestore)
+	u("POST", "/backupNow", a.uiBackupNow)
 	u("POST", "/import", a.uiImport)
 }
 
@@ -456,6 +457,10 @@ func (a *API) uiSetSettings(w http.ResponseWriter, r *http.Request) {
 	if g.SessionMinutes > 0 {
 		cur.SessionMinutes = g.SessionMinutes
 	}
+	cur.TgToken, cur.TgChat = strings.TrimSpace(g.TgToken), strings.TrimSpace(g.TgChat)
+	if g.TgBackupHours >= 0 && g.TgBackupHours <= 720 {
+		cur.TgBackupHours = g.TgBackupHours
+	}
 	cur.BasePath, cur.TLSCert, cur.TLSKey = bp, strings.TrimSpace(g.TLSCert), strings.TrimSpace(g.TLSKey)
 	a.st.touch()
 	a.st.mu.Unlock()
@@ -746,4 +751,12 @@ func (a *API) uiImport(w http.ResponseWriter, r *http.Request) {
 		msg += ". Services were created DISABLED: enable them when you are ready."
 	}
 	ok(w, msg, nil)
+}
+
+func (a *API) uiBackupNow(w http.ResponseWriter, r *http.Request) {
+	if err := a.st.SendBackup(); err != nil {
+		fail(w, err.Error())
+		return
+	}
+	ok(w, "backup sent to Telegram", nil)
 }

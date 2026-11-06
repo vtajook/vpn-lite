@@ -170,6 +170,7 @@ func serve(args []string) error {
 	st.mu.RLock()
 	g := st.st.Global
 	st.mu.RUnlock()
+	go st.BackupLoop(st.stop)
 	api := &API{st: st, d: dm, base: g.BasePath}
 	srv := &http.Server{Addr: fmt.Sprintf("%s:%d", g.Bind, g.Port), Handler: api.Handler(),
 		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 60 * time.Second, WriteTimeout: 120 * time.Second, IdleTimeout: 120 * time.Second}
