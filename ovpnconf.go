@@ -220,7 +220,10 @@ func ovpnClientConfig(in *Inbound, proto, reqHost string) (string, error) {
 		}
 	}
 	if len(remotes) == 0 {
-		h := strings.TrimSpace(in.Listen)
+		h := strings.TrimSpace(strSetting(s, "connDomain", ""))
+		if h == "" {
+			h = strings.TrimSpace(in.Listen)
+		}
 		if h == "" || h == "0.0.0.0" {
 			h = reqHost
 			if hh, _, err := net.SplitHostPort(h); err == nil {

@@ -203,6 +203,10 @@ func (a *API) fillInbound(r *http.Request, in *Inbound, isNew bool) string {
 	if in.Settings == nil {
 		in.Settings = map[string]any{}
 	}
+	if in.Protocol == "l2tp" && in.Port == 1701 && boolSetting(in.Settings, "ipsecEnable", true) &&
+		strings.TrimSpace(strSetting(in.Settings, "ipsecPsk", "")) == "" {
+		return "IPsec pre-shared key is required (or set ipsecEnable to false)"
+	}
 	return ""
 }
 

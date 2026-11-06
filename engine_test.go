@@ -274,7 +274,7 @@ func TestBotAPIContract(t *testing.T) {
 		t.Fatalf("add inbound: %v", r)
 	}
 	r = post("/panel/api/inbounds/add", url.Values{"remark": {"l2tp"}, "enable": {"true"}, "port": {"1701"},
-		"protocol": {"l2tp"}, "settings": {`{"clients":[]}`}})
+		"protocol": {"l2tp"}, "settings": {`{"clients":[],"ipsecEnable":false}`}})
 	if r["success"] != true {
 		t.Fatalf("add l2tp: %v", r)
 	}
