@@ -66,6 +66,8 @@ func setup(args []string) error {
 	base := fs.String("base", "", "base path, e.g. /secret/ (default /)")
 	bind := fs.String("bind", "", "listen address (default all)")
 	noTLS := fs.Bool("no-tls", false, "do not create a self-signed certificate")
+	crtPath := fs.String("cert", "", "HTTPS certificate file (e.g. Let's Encrypt fullchain.pem)")
+	keyPath := fs.String("key", "", "HTTPS private key file")
 	fs.Parse(args)
 	st, err := OpenStore(filepath.Join(d.data, "state.json"))
 	if err != nil {
@@ -92,6 +94,9 @@ func setup(args []string) error {
 	}
 	if *bind != "" {
 		g.Bind = *bind
+	}
+	if *crtPath != "" && *keyPath != "" {
+		g.TLSCert, g.TLSKey = *crtPath, *keyPath
 	}
 	needAdmin := st.st.Admin.User == ""
 	st.touch()

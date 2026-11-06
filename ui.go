@@ -210,7 +210,7 @@ func (a *API) uiSummary(w http.ResponseWriter, r *http.Request) {
 		Domain   string `json:"domain"`
 		PSK      string `json:"psk,omitempty"`
 	}
-	var ins []inb
+	ins := []inb{}
 	for _, in := range a.st.sortedInbounds() {
 		ins = append(ins, inb{ID: in.ID, Remark: in.Remark, Protocol: in.Protocol, Port: in.Port, Enable: in.Enable,
 			Members: len(a.st.membersLocked(in.ID)), Domain: strings.TrimSpace(strSetting(in.Settings, "connDomain", "")), PSK: l2tpPSK(in)})

@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 # vpn-lite installer.  Install / update:
 #   bash <(curl -fsSL https://raw.githubusercontent.com/vtajook/vpn-lite/main/install.sh)
-# Options:  --port N  --user NAME  --pass PASS  --base /secret/  --version vX.Y.Z
+# Options:  --port N  --user NAME  --domain panel.example.com  --pass PASS  --base /secret/  --version vX.Y.Z
 #           --no-deps (do not apt-install daemons)   uninstall
 # Re-running updates the binary and restarts the PANEL only: running tunnels stay up.
 set -euo pipefail
 
 REPO="${VPN_LITE_REPO:-vtajook/vpn-lite}"
 BIN=/usr/local/bin/vpn-lite
-PORT=""; USER_=""; PASS=""; BASE=""; VERSION="latest"; DEPS=1; ACTION=install
+PORT=""; DOMAIN=""; USER_=""; PASS=""; BASE=""; VERSION="latest"; DEPS=1; ACTION=install
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --port) PORT="$2"; shift 2;;
     --user) USER_="$2"; shift 2;;
+    --domain) DOMAIN="$2"; shift 2;;
     --pass) PASS="$2"; shift 2;;
     --base) BASE="$2"; shift 2;;
     --version) VERSION="$2"; shift 2;;
@@ -147,20 +148,42 @@ if [ "$first" = 1 ] && [ -r /dev/tty ] && { [ -z "$USER_" ] || [ -z "$PASS" ] ||
     PORT="${PORT:-2096}"
   fi
 fi
+# Optional panel domain: get a free Let's Encrypt certificate for it (needs the domain's A record
+# pointing here and port 80 free for a moment).
+if [ "$first" = 1 ] && [ -z "$DOMAIN" ] && [ -r /dev/tty ]; then
+  read -r -p "Panel domain for HTTPS (empty = use the IP with a self-signed certificate): " DOMAIN </dev/tty || true
+fi
+CERT=""; KEY=""
+if [ -n "$DOMAIN" ]; then
+  say "getting an SSL certificate for $DOMAIN"
+  if [ "$DEPS" = 1 ] && ! command -v certbot >/dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq certbot >/dev/null 2>&1 || true
+  fi
+  if ss -ltn 2>/dev/null | grep -q ':80 '; then
+    echo "WARNING: port 80 is in use; free it and run again with --domain $DOMAIN"
+  elif command -v certbot >/dev/null 2>&1 && \
+     certbot certonly --standalone -d "$DOMAIN" --agree-tos --register-unsafely-without-email -n --keep-until-expiring; then
+    CERT="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"; KEY="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
+    echo "certificate OK (renews automatically)"
+  else
+    echo "WARNING: could not get a certificate (is the A record of $DOMAIN pointing to this server?). Using a self-signed one."
+  fi
+fi
 args=()
+[ -n "$CERT" ] && args+=(-cert "$CERT" -key "$KEY")
 [ -n "$PORT" ] && args+=(-port "$PORT")
 [ -n "$USER_" ] && args+=(-user "$USER_")
 [ -n "$PASS" ] && args+=(-pass "$PASS")
 [ -n "$BASE" ] && args+=(-base "$BASE")
-if [ "$first" = 1 ] || [ ${#args[@]} -gt 0 ]; then
-  say "configuring"
-  "$BIN" setup "${args[@]}"
-fi
+say "configuring"
+SETUP_OUT="$("$BIN" setup "${args[@]}" | tee /dev/stderr)"
+PP="$(printf '%s\n' "$SETUP_OUT" | sed -n 's/^panel port: \([0-9]*\).*/\1/p' | tail -1)"
 
 systemctl enable vpn-lite >/dev/null 2>&1
 systemctl restart vpn-lite
 sleep 1
 systemctl is-active --quiet vpn-lite && say "vpn-lite is running" || { journalctl -u vpn-lite -n 20 --no-pager; exit 1; }
 echo
-echo "Open the panel at https://<server-ip>:<port>/  (self-signed certificate; the port was printed above)."
+if [ -n "$CERT" ]; then echo "Open the panel at https://$DOMAIN:${PP:-2096}/"
+else echo "Open the panel at https://<server-ip>:${PP:-2096}/  (self-signed certificate: accept the browser warning)."; fi
 echo "Import accounts from the old panel:  vpn-lite import -from https://old-host:port/ -user U -pass P -port-shift 10000"
