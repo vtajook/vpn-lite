@@ -279,6 +279,7 @@ func (r *RadiusServer) handleAuth(from *net.UDPAddr, p *radPkt) []byte {
 		return reject("unknown NAS", -1)
 	}
 	inbound, acc := r.st.inboundOfProto(user, proto)
+	Events.Add("auth", proto, user, "access-request from %s (NAS %q)", from.IP, nas)
 
 	var verify func(stored string) bool
 	var msSuccess []byte

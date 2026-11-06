@@ -17,6 +17,16 @@ ATTRIBUTE	Framed-Protocol	7	integer
 ATTRIBUTE	Framed-IP-Address	8	ipaddr
 ATTRIBUTE	Framed-IP-Netmask	9	ipaddr
 ATTRIBUTE	Framed-Routing	10	integer
+ATTRIBUTE	Login-IP-Host	14	ipaddr
+ATTRIBUTE	Login-Service	15	integer
+ATTRIBUTE	Login-TCP-Port	16	integer
+ATTRIBUTE	Callback-Number	19	string
+ATTRIBUTE	Framed-Route	22	string
+ATTRIBUTE	Termination-Action	29	integer
+ATTRIBUTE	Proxy-State	33	string
+ATTRIBUTE	Acct-Multi-Session-Id	50	string
+ATTRIBUTE	Acct-Link-Count	51	integer
+ATTRIBUTE	Framed-Pool	88	string
 ATTRIBUTE	Filter-Id	11	string
 ATTRIBUTE	Framed-MTU	12	integer
 ATTRIBUTE	Framed-Compression	13	integer

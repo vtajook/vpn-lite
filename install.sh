@@ -342,6 +342,8 @@ do_diag() {
   echo "== recent errors =="
   tail -n 15 /var/log/vpn-lite/events.log 2>/dev/null
   journalctl -u vpn-lite -n 200 --no-pager 2>/dev/null | grep -iE 'error|fail' | tail -8
+  echo "== ocserv (Cisco) log =="; journalctl -t ocserv -t ocserv-main -t ocserv-sm -n 25 --no-pager 2>/dev/null | tail -25
+  echo "== radius port =="; ss -lun 2>/dev/null | grep -E ':181[23] ' || echo "RADIUS 1812/1813 not listening"
   echo "== openvpn log =="; tail -n 12 /var/log/vpn-lite/openvpn-*.log 2>/dev/null
 }
 
