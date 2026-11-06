@@ -80,6 +80,8 @@ func (a *API) uiRoutes(mux *http.ServeMux) {
 	u("POST", "/certIssue/{id}", a.uiCertIssue)
 	u("GET", "/certStatus/{id}", a.uiCertStatus)
 	u("GET", "/backup", a.uiBackup)
+	u("POST", "/resetTotal", a.uiResetTotal)
+	u("POST", "/deleteExpired", a.uiDeleteExpired)
 	u("GET", "/updateCheck", a.uiUpdateCheck)
 	u("POST", "/update", a.uiUpdate)
 	u("POST", "/reboot", a.uiReboot)
@@ -780,4 +782,49 @@ func (a *API) uiBackupNow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ok(w, "backup sent to Telegram", nil)
+}
+
+// uiResetTotal sets the server-wide lifetime usage counter back to zero (accounts keep their own usage).
+func (a *API) uiResetTotal(w http.ResponseWriter, r *http.Request) {
+	a.st.mu.Lock()
+	a.st.st.Global.TotalUsed = 0
+	a.st.st.Global.TotalInit = true
+	a.st.touch()
+	a.st.mu.Unlock()
+	ok(w, "total usage reset", nil)
+}
+
+// uiDeleteExpired removes every account whose expiry date has passed (dry=true only counts).
+func (a *API) uiDeleteExpired(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Dry bool `json:"dry"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	now := nowMs()
+	var kick []string
+	var reload []int
+	a.st.mu.Lock()
+	for k, acc := range a.st.st.Accounts {
+		if !acc.expired(now) {
+			continue
+		}
+		kick = append(kick, acc.Email)
+		reload = append(reload, acc.Inbounds...)
+		if !req.Dry {
+			delete(a.st.st.Accounts, k)
+		}
+	}
+	if !req.Dry && len(kick) > 0 {
+		a.st.touch()
+	}
+	a.st.mu.Unlock()
+	if !req.Dry {
+		for _, e := range kick {
+			a.d.Kick(e)
+		}
+		for _, id := range unionInts(reload, nil) {
+			a.d.ReloadInbound(id)
+		}
+	}
+	ok(w, "", len(kick))
 }

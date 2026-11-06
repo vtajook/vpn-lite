@@ -96,6 +96,7 @@ type GlobalSettings struct {
 	// TotalUsed is the lifetime traffic of the whole server. It only ever grows: deleting an
 	// account or resetting its volume never lowers it.
 	TotalUsed int64 `json:"totalUsed"`
+	TotalInit bool  `json:"totalInit"` // the counter was seeded once; a manual reset must not be undone at restart
 }
 
 type Store struct {
@@ -141,7 +142,11 @@ func OpenStore(path string) (*Store, error) {
 		s.st.RadiusKey = randHex(12)
 		s.dirty = true
 	}
-	s.rebaseTotalLocked()
+	if !s.st.Global.TotalInit {
+		s.rebaseTotalLocked()
+		s.st.Global.TotalInit = true
+		s.dirty = true
+	}
 	g := &s.st.Global
 	if g.BasePath == "" {
 		g.BasePath = "/"

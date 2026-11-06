@@ -655,3 +655,32 @@ func TestLifetimeUsageNeverDrops(t *testing.T) {
 		t.Fatalf("baseline %d", st.st.Global.TotalUsed)
 	}
 }
+
+func TestResetTotalAndDeleteExpired(t *testing.T) {
+	st := testStore(t)
+	seed(st)
+	st.AddTraffic("alice@x", 100, 100)
+	st.mu.Lock()
+	st.st.Accounts["alice@x"].ExpiryTime = nowMs() - 1000
+	st.mu.Unlock()
+	a := &API{st: st, d: noDaemonsT{}, base: "/"}
+	rec := httptest.NewRecorder()
+	a.uiDeleteExpired(rec, httptest.NewRequest("POST", "/", strings.NewReader(`{"dry":true}`)))
+	if _, ok := st.st.Accounts["alice@x"]; !ok {
+		t.Fatal("dry run deleted an account")
+	}
+	rec = httptest.NewRecorder()
+	a.uiDeleteExpired(rec, httptest.NewRequest("POST", "/", strings.NewReader(`{}`)))
+	if _, ok := st.st.Accounts["alice@x"]; ok {
+		t.Fatal("expired account was not deleted")
+	}
+	if st.st.Global.TotalUsed != 200 {
+		t.Fatalf("deleting lowered the total: %d", st.st.Global.TotalUsed)
+	}
+	a.uiResetTotal(httptest.NewRecorder(), httptest.NewRequest("POST", "/", nil))
+	st.mu.Lock()
+	if st.st.Global.TotalUsed != 0 || !st.st.Global.TotalInit {
+		t.Fatalf("reset: %d", st.st.Global.TotalUsed)
+	}
+	st.mu.Unlock()
+}
