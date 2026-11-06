@@ -243,8 +243,6 @@ function inboundModal(i){const isNew=!i;const raw=i?JSON.parse(i.settings):{};de
   !isNew&&i.protocol!=="l2tp"&&h("button",{class:"btn",onclick:async()=>{if(!confirm(t("confirm")))return;await post("panel/ui/certs/"+i.id+"?cn="+encodeURIComponent(raw.connDomain||location.hostname));toast(t("saved"))}},t("gen")),
   h("button",{class:"btn",onclick:()=>m.remove()},t("cancel")),
   h("button",{class:"btn p",onclick:async()=>{let s;try{s=JSON.parse(f.adv.value||"{}")}catch(e){toast("JSON",1);return}
-   const isCisco=proto.value==="openconnect";
-   if(isCisco&&!f.dom.value.trim()){toast(t("domreq"),1);return}
    const base=isNew?{}:{...raw};
    const merged={...base,...s};
    merged.connDomain=f.dom.value.trim();{const mv=parseInt(f.mtu.value);if(mv>0)merged.mtu=mv;else delete merged.mtu}
@@ -255,18 +253,8 @@ function inboundModal(i){const isNew=!i;const raw=i?JSON.parse(i.settings):{};de
    if(proto.value==="openvpn"){merged.udpEnable=f.udp.checked;merged.tcpEnable=f.tcpOn.checked;
     const tp=+f.tcp.value;if(tp>0&&tp!==+f.port.value){merged.separatePorts=true;merged.tcpPort=tp}else{merged.separatePorts=false;delete merged.tcpPort}}
    const o={remark:f.remark.value,enable:f.en.checked,port:f.port.value,listen:f.listen.value,protocol:proto.value,settings:JSON.stringify({clients:[],...merged}),streamSettings:"{}",sniffing:"{}"};
-   const doSave=async()=>{const r=await form("panel/api/inbounds/"+(isNew?"add":"update/"+i.id),o);
-    if(!r.success){toast(r.msg,1);return}toast(t("saved"));m.remove();render()};
-   if(!isCisco){await doSave();return}
-   // Cisco/AnyConnect needs a TLS certificate: get one for the domain first and show the log
-   const logBox=h("pre",{style:"max-height:46vh;overflow:auto;direction:ltr;text-align:left"},t("certwait"));
-   const btns=h("div",{class:"row"});
-   const lm=modal(t("certget")+" "+merged.connDomain,h("div",{},logBox,btns),[]);
-   let res;try{res=await call("panel/ui/issueCert",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({domain:merged.connDomain})})}catch(e){res={ok:false,log:e.message}}
-   logBox.textContent=res.log;
-   btns.replaceChildren(
-    h("button",{class:"btn p",onclick:async()=>{lm.remove();await doSave()}},res.ok?t("certsave"):t("certsaveanyway")),
-    h("button",{class:"btn",onclick:()=>lm.remove()},t("back")))
+   const r=await form("panel/api/inbounds/"+(isNew?"add":"update/"+i.id),o);
+   if(!r.success){toast(r.msg,1);return}toast(t("saved"));m.remove();render()
   }},t("save"))]);sync()}
 
 

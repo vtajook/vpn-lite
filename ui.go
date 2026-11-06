@@ -80,7 +80,6 @@ func (a *API) uiRoutes(mux *http.ServeMux) {
 	u("GET", "/backup", a.uiBackup)
 	u("POST", "/restart", a.uiRestart)
 	u("POST", "/restore", a.uiRestore)
-	u("POST", "/issueCert", a.uiIssueCert)
 	u("POST", "/backupNow", a.uiBackupNow)
 	u("POST", "/import", a.uiImport)
 }
@@ -763,15 +762,4 @@ func (a *API) uiBackupNow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ok(w, "backup sent to Telegram", nil)
-}
-
-// uiIssueCert gets a Let's Encrypt certificate for a connection domain and reports the full log.
-func (a *API) uiIssueCert(w http.ResponseWriter, r *http.Request) {
-	var req struct{ Domain string }
-	if json.NewDecoder(r.Body).Decode(&req) != nil || strings.TrimSpace(req.Domain) == "" {
-		fail(w, "domain is required")
-		return
-	}
-	good, log := issueCert(req.Domain)
-	ok(w, "", map[string]any{"ok": good, "log": log})
 }
