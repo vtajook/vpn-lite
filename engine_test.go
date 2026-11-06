@@ -627,3 +627,31 @@ func TestVpnUiDBBackup(t *testing.T) {
 		t.Fatalf("user1: %+v", u)
 	}
 }
+
+func TestLifetimeUsageNeverDrops(t *testing.T) {
+	st := testStore(t)
+	seed(st)
+	st.AddTraffic("alice@x", 1000, 2000)
+	if st.st.Global.TotalUsed != 3000 {
+		t.Fatalf("total %d", st.st.Global.TotalUsed)
+	}
+	st.mu.Lock()
+	st.st.Accounts["alice@x"].Up, st.st.Accounts["alice@x"].Down = 0, 0 // manual volume reset
+	st.mu.Unlock()
+	st.mu.Lock()
+	delete(st.st.Accounts, "alice@x") // account deleted
+	st.rebaseTotalLocked()
+	st.mu.Unlock()
+	if st.st.Global.TotalUsed != 3000 {
+		t.Fatalf("lifetime usage dropped to %d", st.st.Global.TotalUsed)
+	}
+	// an old state without the counter starts from what the accounts already used
+	st.mu.Lock()
+	st.st.Global.TotalUsed = 0
+	st.st.Accounts["bob@x"] = &Account{Email: "bob@x", AllTime: 500}
+	st.rebaseTotalLocked()
+	st.mu.Unlock()
+	if st.st.Global.TotalUsed < 500 {
+		t.Fatalf("baseline %d", st.st.Global.TotalUsed)
+	}
+}

@@ -206,7 +206,6 @@ func (a *API) uiSummary(w http.ResponseWriter, r *http.Request) {
 	a.st.mu.RLock()
 	for _, acc := range a.st.st.Accounts {
 		cnt[statusOf(acc, now)]++
-		used += acc.Up + acc.Down
 	}
 	type inb struct {
 		ID       int    `json:"id"`
@@ -225,6 +224,7 @@ func (a *API) uiSummary(w http.ResponseWriter, r *http.Request) {
 			Members: len(a.st.membersLocked(in.ID)), Domain: strings.TrimSpace(strSetting(in.Settings, "connDomain", "")), PSK: l2tpPSK(in)})
 	}
 	n := len(a.st.st.Accounts)
+	used = a.st.st.Global.TotalUsed
 	a.st.mu.RUnlock()
 	byIn := map[int]int{}
 	sess := Sessions.Snapshot()
@@ -704,6 +704,10 @@ func (a *API) uiRestore(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.st.st.Inbounds, a.st.st.Accounts, a.st.st.NextInbound = in.Inbounds, in.Accounts, next
+	if in.Global.TotalUsed > a.st.st.Global.TotalUsed { // never lower the lifetime usage
+		a.st.st.Global.TotalUsed = in.Global.TotalUsed
+	}
+	a.st.rebaseTotalLocked()
 	g := &a.st.st.Global
 	g.LimitStrategy, g.EvictGraceSec, g.DefaultSingleProto = in.Global.LimitStrategy, in.Global.EvictGraceSec, in.Global.DefaultSingleProto
 	if g.LimitStrategy == "" {

@@ -52,7 +52,7 @@ const BASE = location.pathname.replace(/[^\/]*$/, "");
 const T = {
  en:{dash:"Dashboard",accounts:"Accounts",inbounds:"Inbounds",online:"Online",logs:"Logs",settings:"Settings",login:"Sign in",user:"Username",pass:"Password",
   add:"Add account",bulkc:"Bulk create",search:"Search…",all:"All",active:"Active",expired:"Expired",depleted:"Depleted",disabled:"Disabled",save:"Save",cancel:"Cancel",
-  del:"Delete",edit:"Edit",reset:"Reset traffic",kick:"Kick",enable:"Enable",disable:"Disable",extend:"Extend",used:"Used",expiry:"Expiry",devices:"Devices",speed:"Speed",
+  del:"Delete",edit:"Edit",reset:"Reset traffic",kick:"Kick",enable:"Enable",disable:"Disable",extend:"Extend",used:"Total usage (lifetime)",expiry:"Expiry",devices:"Devices",speed:"Speed",
   status:"Status",email:"Name / email",total:"Quota (GB, 0=∞)",days:"Days (0=∞)",limit:"Device limit (0=default)",down:"Download KB/s (0=∞)",up:"Upload KB/s (0=∞)",
   comment:"Comment",resetd:"Auto reset (days)",protocols:"Services",sel:"selected",confirm:"Are you sure?",saved:"Saved",never:"never",left:"left",unl:"∞",
   page:"Page",of:"of",sessions:"Sessions",onlineu:"Online users",cpu:"CPU",mem:"Memory",net:"Network",members:"accounts",port:"Port",remark:"Name",proto:"Protocol",
@@ -64,7 +64,7 @@ const T = {
   full:"Device limit reached",none:"Nothing here yet",single:"One protocol at a time",singleh:"The account is served on all selected protocols, but can be connected through only one of them at a time.",defsingle:"Default for accounts created by the bot / API"},
  fa:{dash:"داشبورد",accounts:"اکانت‌ها",inbounds:"سرویس‌ها",online:"آنلاین",logs:"لاگ",settings:"تنظیمات",login:"ورود",user:"نام کاربری",pass:"رمز",
   add:"افزودن اکانت",bulkc:"ساخت گروهی",search:"جستجو…",all:"همه",active:"فعال",expired:"منقضی",depleted:"تمام‌شده",disabled:"غیرفعال",save:"ذخیره",cancel:"انصراف",
-  del:"حذف",edit:"ویرایش",reset:"ریست حجم",kick:"قطع",enable:"فعال",disable:"غیرفعال",extend:"تمدید",used:"مصرف",expiry:"انقضا",devices:"دستگاه",speed:"سرعت",
+  del:"حذف",edit:"ویرایش",reset:"ریست حجم",kick:"قطع",enable:"فعال",disable:"غیرفعال",extend:"تمدید",used:"مصرف کل (از ابتدا)",expiry:"انقضا",devices:"دستگاه",speed:"سرعت",
   status:"وضعیت",email:"نام / ایمیل",total:"حجم (گیگ، ۰=نامحدود)",days:"روز (۰=نامحدود)",limit:"محدودیت دستگاه (۰=پیش‌فرض)",down:"دانلود KB/s (۰=نامحدود)",up:"آپلود KB/s (۰=نامحدود)",
   comment:"توضیح",resetd:"ریست خودکار (روز)",protocols:"سرویس‌ها",sel:"انتخاب‌شده",confirm:"مطمئنی؟",saved:"ذخیره شد",never:"هرگز",left:"مانده",unl:"∞",
   page:"صفحه",of:"از",sessions:"اتصال‌ها",onlineu:"کاربر آنلاین",cpu:"پردازنده",mem:"حافظه",net:"شبکه",members:"اکانت",port:"پورت",remark:"نام",proto:"پروتکل",

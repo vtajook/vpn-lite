@@ -262,6 +262,7 @@ func (s *Store) AddTraffic(email string, up, down int64) (depleted bool) {
 	acc.Up += up
 	acc.Down += down
 	acc.AllTime += up + down
+	s.st.Global.TotalUsed += up + down
 	acc.LastOnline = nowMs()
 	s.touch()
 	return acc.overQuota()

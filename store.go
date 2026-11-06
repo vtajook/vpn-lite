@@ -93,6 +93,9 @@ type GlobalSettings struct {
 	TgNoLogin     bool   `json:"tgNoLogin"`     // true = do not message panel logins
 	TgCpuAlert    int    `json:"tgCpuAlert"`    // message when CPU stays above this percent (0 = off)
 	TgCpuTouched  bool   `json:"tgCpuTouched"`  // set once the admin saved the field (so 0 really means off)
+	// TotalUsed is the lifetime traffic of the whole server. It only ever grows: deleting an
+	// account or resetting its volume never lowers it.
+	TotalUsed int64 `json:"totalUsed"`
 }
 
 type Store struct {
@@ -138,6 +141,7 @@ func OpenStore(path string) (*Store, error) {
 		s.st.RadiusKey = randHex(12)
 		s.dirty = true
 	}
+	s.rebaseTotalLocked()
 	g := &s.st.Global
 	if g.BasePath == "" {
 		g.BasePath = "/"
@@ -245,4 +249,17 @@ func delInt(a []int, v int) []int {
 		}
 	}
 	return out
+}
+
+// rebaseTotalLocked makes sure the lifetime counter is never below what the accounts in the
+// state have already used (first start after an upgrade, restore, import).
+func (s *Store) rebaseTotalLocked() {
+	var sum int64
+	for _, a := range s.st.Accounts {
+		sum += a.AllTime
+	}
+	if sum > s.st.Global.TotalUsed {
+		s.st.Global.TotalUsed = sum
+		s.dirty = true
+	}
 }

@@ -44,6 +44,7 @@ func importCmd(args []string) error {
 		defer st.Close()
 		st.mu.Lock()
 		st.st.Inbounds, st.st.Accounts, st.st.NextInbound = in.Inbounds, in.Accounts, in.NextInbound
+		st.rebaseTotalLocked()
 		st.touch()
 		st.mu.Unlock()
 		fmt.Printf("restored %d services and %d accounts (%d unsupported services skipped)\n", len(in.Inbounds), len(in.Accounts), skipped)
@@ -176,6 +177,7 @@ func importFromPanel(st *Store, from, user, pass string, shift int, enable bool)
 			}
 		}
 	}
+	st.rebaseTotalLocked()
 	st.touch()
 	return nIn, nAcc, skipped, nil
 }
