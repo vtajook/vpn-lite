@@ -166,21 +166,28 @@ if [ "$first" = 1 ] && [ -z "$DOMAIN" ] && [ -r /dev/tty ]; then
   read -r -p "Panel domain for HTTPS (empty = use the IP with a self-signed certificate): " DOMAIN </dev/tty || true
 fi
 CERT=""; KEY=""
-if [ -n "$DOMAIN" ]; then
-  say "getting an SSL certificate for $DOMAIN"
-  if [ "$DEPS" = 1 ] && ! command -v certbot >/dev/null 2>&1; then
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq certbot >/dev/null 2>&1 || true
+MYIP="$(curl -4fsS --max-time 8 https://api.ipify.org 2>/dev/null || true)"
+while [ -n "$DOMAIN" ]; do
+  say "SSL certificate for $DOMAIN"
+  DIP="$(getent ahostsv4 "$DOMAIN" 2>/dev/null | awk '{print $1; exit}')"
+  echo "  domain points to: ${DIP:-<not resolved>}   this server: ${MYIP:-unknown}"
+  if [ -n "$DIP" ] && [ -n "$MYIP" ] && [ "$DIP" != "$MYIP" ]; then
+    echo "  WARNING: the A record of $DOMAIN does not point to this server yet (Cloudflare: turn the proxy OFF / grey cloud)."
   fi
-  if ss -ltn 2>/dev/null | grep -q ':80 '; then
-    echo "WARNING: port 80 is in use; free it and run again with --domain $DOMAIN"
+  if ! command -v certbot >/dev/null 2>&1 && command -v apt-get >/dev/null; then
+    echo "  installing certbot..."; apt-get update -qq; DEBIAN_FRONTEND=noninteractive apt-get install -y certbot >/dev/null || echo "  certbot install failed"
+  fi
+  if ss -ltn 2>/dev/null | awk '{print $4}' | grep -qE '[:.]80$'; then
+    echo "  port 80 is busy: $(ss -ltnp 2>/dev/null | grep -E '[:.]80 ' | head -1)"
   elif command -v certbot >/dev/null 2>&1 && \
      certbot certonly --standalone -d "$DOMAIN" --agree-tos --register-unsafely-without-email -n --keep-until-expiring; then
     CERT="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"; KEY="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
-    echo "certificate OK (renews automatically)"
-  else
-    echo "WARNING: could not get a certificate (is the A record of $DOMAIN pointing to this server?). Using a self-signed one."
+    echo "  certificate OK (renews automatically)"; break
   fi
-fi
+  echo "  could not get a certificate for $DOMAIN."
+  [ -r /dev/tty ] || { DOMAIN=""; break; }
+  read -r -p "  Enter a domain to retry (empty = continue with a self-signed certificate): " DOMAIN </dev/tty || DOMAIN=""
+done
 args=()
 [ -n "$CERT" ] && args+=(-cert "$CERT" -key "$KEY")
 [ "$CLEAN" = 1 ] && args+=(-reset-tls)
