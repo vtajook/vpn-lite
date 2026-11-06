@@ -188,9 +188,10 @@ function accountModal(a){const isNew=!a;a=a||{email:"",username:"",password:rand
    const j=await r.json();if(!j.success){toast(j.msg,1);return}toast(t("saved"));m.remove();render()}},t("save"))]);}
 const bulkOne=(a,e)=>post("panel/ui/bulk",{action:a,emails:[e]});
 function randpw(){const al="abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";const b=crypto.getRandomValues(new Uint8Array(10));return [...b].map(x=>al[x%al.length]).join("")}
-function infoModal(a){const host=location.hostname;const txt=`user: ${a.username}\npass: ${a.password}\nserver: ${host}`;
- const m=modal(a.email,h("div",{},h("pre",{},txt),h("div",{class:"mu"},a.inbounds.map(i=>{const x=inboundsCache.find(q=>q.id===i);return x?x.remark+" ("+x.protocol+":"+x.port+")":i}).join(" · ")),
-  a.inbounds.filter(i=>(inboundsCache.find(q=>q.id===i)||{}).protocol==="openvpn").map(i=>h("div",{style:"margin-top:8px"},"OpenVPN: ",h("a",{href:BASE+"panel/api/inbounds/"+i+"/ovpn/udp"},"UDP .ovpn")," ",h("a",{href:BASE+"panel/api/inbounds/"+i+"/ovpn/tcp"},"TCP .ovpn")))),
+function infoModal(a){const lines=a.inbounds.map(id=>{const x=inboundsCache.find(q=>q.id===id);if(!x)return null;const host=x.domain||location.hostname;return {id,x,host,line:`${x.protocol}  ${host}:${x.port}`}}).filter(Boolean);
+ const txt=`user: ${a.username}\npass: ${a.password}\n`+lines.map(l=>l.line).join("\n");
+ const m=modal(a.email,h("div",{},h("pre",{},txt),
+  lines.filter(l=>l.x.protocol==="openvpn").map(l=>h("div",{style:"margin-top:8px"},"OpenVPN: ",h("a",{href:BASE+"panel/api/inbounds/"+l.id+"/ovpn/udp"},"UDP .ovpn")," ",h("a",{href:BASE+"panel/api/inbounds/"+l.id+"/ovpn/tcp"},"TCP .ovpn")))),
   [h("button",{class:"btn",onclick:()=>{navigator.clipboard&&navigator.clipboard.writeText(txt);toast(t("copy"))}},t("copy")),h("button",{class:"btn",onclick:()=>m.remove()},t("cancel"))])}
 function bulkCreateModal(){const f={prefix:h("input",{value:"u"}),count:h("input",{type:"number",value:10}),gb:h("input",{type:"number",value:0}),days:h("input",{type:"number",value:30}),limit:h("input",{type:"number",value:0}),dn:h("input",{type:"number",value:0}),up:h("input",{type:"number",value:0}),single:h("input",{type:"checkbox",checked:true})};
  const boxes=inboundsCache.map(i=>[i,h("input",{type:"checkbox"})]);
@@ -215,26 +216,26 @@ function inboundModal(i){const isNew=!i;const raw=i?JSON.parse(i.settings):{};de
  const proto=h("select",{disabled:!isNew,onchange:()=>{if(isNew){f.port.value={openvpn:1194,l2tp:1701,openconnect:443}[proto.value];sync()}}},["openvpn","l2tp","openconnect"].map(p=>h("option",{value:p,selected:i.protocol===p},p)));
  const tcpSep=raw.separatePorts&&raw.tcpPort?raw.tcpPort:"";
  const f={remark:h("input",{value:i.remark}),port:h("input",{type:"number",value:i.port}),tcp:h("input",{type:"number",value:tcpSep,placeholder:t("portudp")}),
-  udp:h("input",{type:"checkbox",checked:raw.udpEnable!==false}),ips:h("input",{type:"checkbox",checked:raw.ipsecEnable!==false}),dom:h("input",{value:raw.connDomain||"",placeholder:"vpn.example.com",dir:"ltr"}),psk:h("input",{value:raw.ipsecPsk||"",placeholder:t("psk"),autocomplete:"off"}),tcpOn:h("input",{type:"checkbox",checked:raw.tcpEnable!==false}),
+  udp:h("input",{type:"checkbox",checked:raw.udpEnable!==false}),ips:h("input",{type:"checkbox",checked:raw.ipsecEnable!==false}),mtu:h("input",{type:"number",value:raw.mtu||""}),dom:h("input",{value:raw.connDomain||"",placeholder:"vpn.example.com",dir:"ltr"}),psk:h("input",{value:raw.ipsecPsk||"",placeholder:t("psk"),autocomplete:"off"}),tcpOn:h("input",{type:"checkbox",checked:raw.tcpEnable!==false}),
   listen:h("input",{value:i.listen||""}),en:h("input",{type:"checkbox",checked:i.enable}),adv:h("textarea",{rows:8,style:"width:100%;font-family:monospace;font-size:12px"})};
- const rPort=field(t("portudp"),f.port),rTcp=field(t("porttcp"),f.tcp),rUdpOn=field(t("useudp"),f.udp),rTcpOn=field(t("usetcp"),f.tcpOn),rIps=field(t("ipsecon"),f.ips),rPsk=field(t("psk"),f.psk),rDom=field(t("condom"),f.dom);
+ const rPort=field(t("portudp"),f.port),rTcp=field(t("porttcp"),f.tcp),rUdpOn=field(t("useudp"),f.udp),rTcpOn=field(t("usetcp"),f.tcpOn),rIps=field(t("ipsecon"),f.ips),rPsk=field(t("psk"),f.psk),rDom=field(t("condom"),f.dom),rMtu=field("MTU",f.mtu);const DM={openvpn:1350,l2tp:1280,openconnect:1420};
  const lab=h("label",{});rPort.firstChild.replaceWith(lab);
- function sync(){const p=proto.value;lab.textContent=t(p==="openvpn"?"portudp":p==="l2tp"?"portl2":"portoc");
+ function sync(){const p=proto.value;f.mtu.placeholder=String(DM[p]);lab.textContent=t(p==="openvpn"?"portudp":p==="l2tp"?"portl2":"portoc");
   [rTcp,rUdpOn,rTcpOn].forEach(r=>r.style.display=p==="openvpn"?"":"none");[rIps,rPsk].forEach(r=>r.style.display=p==="l2tp"?"":"none")}
- const strip=o=>{const c={...o};["caKey","caCert","serverCert","serverKey","tlsCrypt","certificate","key","udpEnable","tcpEnable","tcpPort","separatePorts","ipsecEnable","ipsecPsk","connDomain"].forEach(k=>{delete c[k]});return c};
+ const strip=o=>{const c={...o};["caKey","caCert","serverCert","serverKey","tlsCrypt","certificate","key","udpEnable","tcpEnable","tcpPort","separatePorts","ipsecEnable","ipsecPsk","connDomain","mtu"].forEach(k=>{delete c[k]});return c};
  f.adv.value=JSON.stringify(strip(raw),null,1);
- const m=modal(isNew?t("newin"):t("edit")+" — "+(i.remark||i.id),h("div",{},field(t("proto"),proto),field(t("remark"),f.remark),rPort,rUdpOn,rTcpOn,rTcp,rIps,rPsk,rDom,field(t("listen"),f.listen),field(t("enable"),f.en),
-  h("div",{class:"mu",style:"margin:8px 0 4px"},t("adv")+" — dns1, dns2, mtu, pool, userLimit, externalProxy:[{dest,port}]"),f.adv),[
+ const m=modal(isNew?t("newin"):t("edit")+" — "+(i.remark||i.id),h("div",{},field(t("proto"),proto),field(t("remark"),f.remark),rPort,rUdpOn,rTcpOn,rTcp,rIps,rPsk,rDom,rMtu,field(t("listen"),f.listen),field(t("enable"),f.en),
+  h("div",{class:"mu",style:"margin:8px 0 4px"},t("adv")+" — dns1, dns2, pool, userLimit, externalProxy:[{dest,port}]"),f.adv),[
   !isNew&&h("button",{class:"btn d",onclick:async()=>{if(!confirm(t("confirm")))return;await form("panel/api/inbounds/del/"+i.id,{});m.remove();render()}},t("del")),
   !isNew&&i.protocol!=="l2tp"&&h("button",{class:"btn",onclick:async()=>{if(!confirm(t("confirm")))return;await post("panel/ui/certs/"+i.id+"?cn="+encodeURIComponent(raw.connDomain||location.hostname));toast(t("saved"))}},t("gen")),
   h("button",{class:"btn",onclick:()=>m.remove()},t("cancel")),
   h("button",{class:"btn p",onclick:async()=>{let s;try{s=JSON.parse(f.adv.value||"{}")}catch(e){toast("JSON",1);return}
    const base=isNew?{}:{...raw};
    const merged={...base,...s};
-   merged.connDomain=f.dom.value.trim();
+   merged.connDomain=f.dom.value.trim();{const mv=parseInt(f.mtu.value);if(mv>0)merged.mtu=mv;else delete merged.mtu}
    if(proto.value==="l2tp"){merged.ipsecEnable=f.ips.checked;merged.ipsecPsk=f.psk.value.trim();
     if(merged.ipsecEnable&&!merged.ipsecPsk){toast(t("pskreq"),1);return}}
-   if(isNew){const d={dns1:"8.8.8.8",dns2:"8.8.4.4"};if(proto.value==="l2tp")d.mtu=1280;if(proto.value==="openvpn")d.mtu=1350;if(proto.value==="openconnect")d.mtu=1420;
+   if(isNew){const d={dns1:"8.8.8.8",dns2:"8.8.4.4"};
     for(const k in d)if(merged[k]==null)merged[k]=d[k]}
    if(proto.value==="openvpn"){merged.udpEnable=f.udp.checked;merged.tcpEnable=f.tcpOn.checked;
     const tp=+f.tcp.value;if(tp>0&&tp!==+f.port.value){merged.separatePorts=true;merged.tcpPort=tp}else{merged.separatePorts=false;delete merged.tcpPort}}

@@ -207,11 +207,12 @@ func (a *API) uiSummary(w http.ResponseWriter, r *http.Request) {
 		Enable   bool   `json:"enable"`
 		Members  int    `json:"members"`
 		Online   int    `json:"online"`
+		Domain   string `json:"domain"`
 	}
 	var ins []inb
 	for _, in := range a.st.sortedInbounds() {
 		ins = append(ins, inb{ID: in.ID, Remark: in.Remark, Protocol: in.Protocol, Port: in.Port, Enable: in.Enable,
-			Members: len(a.st.membersLocked(in.ID))})
+			Members: len(a.st.membersLocked(in.ID)), Domain: strings.TrimSpace(strSetting(in.Settings, "connDomain", ""))})
 	}
 	n := len(a.st.st.Accounts)
 	a.st.mu.RUnlock()
