@@ -80,6 +80,9 @@ func (a *API) uiRoutes(mux *http.ServeMux) {
 	u("POST", "/certIssue/{id}", a.uiCertIssue)
 	u("GET", "/certStatus/{id}", a.uiCertStatus)
 	u("GET", "/backup", a.uiBackup)
+	u("GET", "/updateCheck", a.uiUpdateCheck)
+	u("POST", "/update", a.uiUpdate)
+	u("POST", "/reboot", a.uiReboot)
 	u("POST", "/restart", a.uiRestart)
 	u("POST", "/restore", a.uiRestore)
 	u("POST", "/backupNow", a.uiBackupNow)
@@ -553,6 +556,7 @@ type sysInfo struct {
 	MemPct float64 `json:"mem"`
 	Load   string  `json:"load"`
 	Uptime int64   `json:"uptime"`
+	Ver    string  `json:"version"`
 	RxBps  int64   `json:"rxBps"`
 	TxBps  int64   `json:"txBps"`
 }
@@ -618,6 +622,7 @@ func readSys() sysInfo {
 	if b, err := os.ReadFile("/proc/uptime"); err == nil {
 		v, _ := strconv.ParseFloat(strings.Fields(string(b))[0], 64)
 		s.Uptime = int64(v)
+		s.Ver = version
 	}
 	var rx, tx int64
 	if b, err := os.ReadFile("/proc/net/dev"); err == nil {
