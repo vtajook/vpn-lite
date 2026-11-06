@@ -50,7 +50,7 @@ func TestShaperCommands(t *testing.T) {
 
 func TestNftRuleset(t *testing.T) {
 	r := nftRuleset([]netip.Prefix{netip.MustParsePrefix("10.121.0.0/16"), netip.MustParsePrefix("10.101.0.0/16")})
-	for _, want := range []string{"delete table ip vpnlite", "10.101.0.0/16, 10.121.0.0/16", "masquerade", `oifname "ppp*" return`, "maxseg size set rt mtu"} {
+	for _, want := range []string{"delete table ip vpnlite", "10.101.0.0/16, 10.121.0.0/16", "masquerade", `oifname "ppp*" return`, "maxseg size set 1240"} {
 		if !strings.Contains(r, want) {
 			t.Errorf("ruleset lacks %q", want)
 		}
