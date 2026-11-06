@@ -293,7 +293,10 @@ func ovpnClientConfig(in *Inbound, proto, reqHost, user, pass string) (string, e
 		w("auth-user-pass")
 	}
 	w("setenv CLIENT_CERT 0")
-	if in.Remark != "" {
+	// OpenVPN Connect names the imported profile after FRIENDLY_NAME (it wins over the file name).
+	if user != "" {
+		w("setenv FRIENDLY_NAME %q", user)
+	} else if in.Remark != "" {
 		w("setenv FRIENDLY_NAME %q", in.Remark)
 	}
 	joined := strings.Join(ciphers, ":")
