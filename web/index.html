@@ -193,7 +193,7 @@ function infoModal(a){const items=a.inbounds.map(id=>inboundsCache.find(q=>q.id=
  const blocks=items.map(x=>{const L=[];
   if(x.protocol==="openvpn"){L.push("OpenVPN",`user: ${a.username}`,`pass: ${a.password}`,`file: ${location.origin}${BASE}panel/api/inbounds/${x.id}/ovpn/udp`)}
   else if(x.protocol==="openconnect"){L.push("Cisco AnyConnect",`server: ${host(x)}`,`port: ${x.port}`,`user: ${a.username}`,`pass: ${a.password}`)}
-  else{L.push("L2TP",`server: ${host(x)}`,`user: ${a.username}`,`pass: ${a.password}`);if(x.psk)L.push(`secret (PSK): ${x.psk}`)}
+  else{L.push("L2TP",`server: ${host(x)}`+(x.port!==1701?`:${x.port}`:""),`user: ${a.username}`,`pass: ${a.password}`);if(x.psk)L.push(`secret (PSK): ${x.psk}`)}
   return {x,txt:L.join("\n")}});
  const txt=blocks.map(b=>b.txt).join("\n\n");
  const m=modal(a.email,h("div",{},blocks.map(b=>h("div",{style:"margin-bottom:8px"},h("pre",{},b.txt),
