@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"sort"
@@ -78,6 +79,8 @@ func (a *API) uiRoutes(mux *http.ServeMux) {
 	u("POST", "/certs/{id}", a.uiCerts)
 	u("GET", "/backup", a.uiBackup)
 	u("POST", "/restart", a.uiRestart)
+	u("POST", "/restore", a.uiRestore)
+	u("POST", "/import", a.uiImport)
 }
 
 type accountRow struct {
@@ -642,4 +645,105 @@ func l2tpPSK(in *Inbound) string {
 		return ""
 	}
 	return strings.TrimSpace(strSetting(in.Settings, "ipsecPsk", ""))
+}
+
+// uiRestore replaces accounts and services with the ones in an uploaded backup. The panel login,
+// port, certificate and signing keys of THIS panel are kept, so you stay logged in and reachable.
+func (a *API) uiRestore(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 256<<20))
+	if err != nil || len(body) == 0 {
+		fail(w, "empty upload")
+		return
+	}
+	var in State
+	if json.Unmarshal(body, &in) != nil || (in.Inbounds == nil && in.Accounts == nil) {
+		fail(w, "this is not a vpn-lite backup file")
+		return
+	}
+	a.st.Flush()
+	if cur, err := os.ReadFile(a.st.path); err == nil {
+		os.WriteFile(a.st.path+".pre-restore", cur, 0o600)
+	}
+	a.st.mu.Lock()
+	old := make([]int, 0, len(a.st.st.Inbounds))
+	for id := range a.st.st.Inbounds {
+		old = append(old, id)
+	}
+	if in.Inbounds == nil {
+		in.Inbounds = map[int]*Inbound{}
+	}
+	if in.Accounts == nil {
+		in.Accounts = map[string]*Account{}
+	}
+	next := in.NextInbound
+	for id := range in.Inbounds {
+		if id >= next {
+			next = id + 1
+		}
+	}
+	a.st.st.Inbounds, a.st.st.Accounts, a.st.st.NextInbound = in.Inbounds, in.Accounts, next
+	g := &a.st.st.Global
+	g.LimitStrategy, g.EvictGraceSec, g.DefaultSingleProto = in.Global.LimitStrategy, in.Global.EvictGraceSec, in.Global.DefaultSingleProto
+	if g.LimitStrategy == "" {
+		g.LimitStrategy = "evict"
+	}
+	if g.EvictGraceSec == 0 {
+		g.EvictGraceSec = 30
+	}
+	a.st.touch()
+	ids := old
+	for id := range in.Inbounds {
+		ids = append(ids, id)
+	}
+	nIn, nAcc := len(in.Inbounds), len(in.Accounts)
+	a.st.mu.Unlock()
+	a.st.Flush()
+	for _, id := range ids {
+		a.d.ReloadInbound(id)
+	}
+	ok(w, fmt.Sprintf("restored %d services and %d accounts", nIn, nAcc), nil)
+}
+
+// uiImport pulls services and accounts straight from a running vpn-ui panel.
+func (a *API) uiImport(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		URL, User, Pass string
+		PortShift       int
+		Enable          bool
+	}
+	if json.NewDecoder(r.Body).Decode(&req) != nil || req.URL == "" || req.User == "" || req.Pass == "" {
+		fail(w, "address, username and password of the old panel are required")
+		return
+	}
+	a.st.mu.RLock()
+	before := map[int]bool{}
+	for id := range a.st.st.Inbounds {
+		before[id] = true
+	}
+	a.st.mu.RUnlock()
+	nIn, nAcc, skipped, err := importFromPanel(a.st, req.URL, req.User, req.Pass, req.PortShift, req.Enable)
+	if err != nil {
+		fail(w, err.Error())
+		return
+	}
+	a.st.Flush()
+	a.st.mu.RLock()
+	var added []int
+	for id := range a.st.st.Inbounds {
+		if !before[id] {
+			added = append(added, id)
+		}
+	}
+	a.st.mu.RUnlock()
+	for _, id := range added {
+		a.d.ReloadInbound(id)
+	}
+	msg := fmt.Sprintf("imported %d services and %d accounts", nIn, nAcc)
+	if skipped > 0 {
+		msg += fmt.Sprintf(" (%d clients skipped: no password/email)", skipped)
+	}
+	if !req.Enable {
+		msg += ". Services were created DISABLED: enable them when you are ready."
+	}
+	ok(w, msg, nil)
 }

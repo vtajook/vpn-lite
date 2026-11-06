@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/md5"
+	"io"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -416,5 +417,98 @@ func TestOvpnProfileBothWithCreds(t *testing.T) {
 	}
 	if strings.Index(cfg, "udp") > strings.Index(cfg, "1003 tcp") {
 		t.Error("UDP remote must come first")
+	}
+}
+
+func TestBackupRestoreAndImport(t *testing.T) {
+	st := testStore(t)
+	api := &API{st: st, d: &fakeD{}, base: "/"}
+	ts := httptest.NewServer(api.Handler())
+	defer ts.Close()
+	jar, _ := cookiejar.New(nil)
+	c := &http.Client{Jar: jar}
+	do := func(method, path, ctype, body string) map[string]any {
+		req, _ := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", ctype)
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var m map[string]any
+		jsonDecode(resp, &m)
+		return m
+	}
+	form := "application/x-www-form-urlencoded"
+	do("POST", "/login", form, url.Values{"username": {"admin"}, "password": {"pw"}}.Encode())
+	do("POST", "/panel/api/inbounds/add", form, url.Values{"remark": {"o"}, "enable": {"true"}, "port": {"1194"},
+		"protocol": {"openvpn"}, "settings": {`{"clients":[]}`}}.Encode())
+	r := do("POST", "/panel/api/inbounds/addClient", form, url.Values{"id": {"1"},
+		"settings": {`{"clients":[{"id":"u1","email":"a@x","password":"pass1234","enable":true}]}`}}.Encode())
+	if r["success"] != true {
+		t.Fatalf("addClient: %v", r)
+	}
+	// backup
+	resp, err := c.Get(ts.URL + "/panel/ui/backup")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf strings.Builder
+	io.Copy(&buf, resp.Body)
+	resp.Body.Close()
+	backup := buf.String()
+	if !strings.Contains(backup, "pass1234") {
+		t.Fatal("backup lacks the account")
+	}
+	// wipe, then restore
+	do("POST", "/panel/api/inbounds/del/1", form, "")
+	st.mu.Lock()
+	st.st.Accounts = map[string]*Account{}
+	st.touch()
+	st.mu.Unlock()
+	if r := do("POST", "/panel/ui/restore", "application/json", backup); r["success"] != true {
+		t.Fatalf("restore: %v", r)
+	}
+	st.mu.RLock()
+	_, haveAcc := st.st.Accounts["a@x"]
+	_, haveIn := st.st.Inbounds[1]
+	user := st.st.Admin.User
+	st.mu.RUnlock()
+	if !haveAcc || !haveIn || user != "admin" {
+		t.Fatalf("after restore: account=%v inbound=%v admin=%q", haveAcc, haveIn, user)
+	}
+	if r := do("POST", "/panel/ui/restore", "application/json", `{"hello":1}`); r["success"] == true {
+		t.Fatal("garbage was accepted as a backup")
+	}
+}
+
+func TestImportFromOldPanel(t *testing.T) {
+	old := http.NewServeMux()
+	old.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, envelope{true, "", nil})
+	})
+	old.HandleFunc("/panel/api/inbounds/list", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"success": true, "obj": []map[string]any{{
+			"id": 7, "remark": "ovpn", "enable": true, "port": 1194, "protocol": "openvpn",
+			"settings":    `{"clients":[{"id":"bob","email":"bob@x","password":"secret123","enable":true,"totalGB":1073741824}],"udpEnable":true}`,
+			"clientStats": []map[string]any{{"email": "bob@x", "up": 5, "down": 6, "allTime": 11}}}}})
+	})
+	srv := httptest.NewServer(old)
+	defer srv.Close()
+	st := testStore(t)
+	nIn, nAcc, _, err := importFromPanel(st, srv.URL, "u", "p", 10000, false)
+	if err != nil || nIn != 1 || nAcc != 1 {
+		t.Fatalf("import: %d %d %v", nIn, nAcc, err)
+	}
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+	acc := st.st.Accounts["bob@x"]
+	if acc == nil || acc.Username != "bob" || acc.Up != 5 || acc.TotalGB != 1073741824 {
+		t.Fatalf("account not imported correctly: %+v", acc)
+	}
+	for _, in := range st.st.Inbounds {
+		if in.Port != 11194 || in.Enable {
+			t.Fatalf("inbound should be shifted and disabled: port=%d enable=%v", in.Port, in.Enable)
+		}
 	}
 }
