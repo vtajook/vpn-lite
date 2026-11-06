@@ -29,24 +29,42 @@ func importCmd(args []string) error {
 	if *from == "" || *user == "" || *pass == "" {
 		return fmt.Errorf("-from, -user and -pass are required")
 	}
-	jar, _ := cookiejar.New(nil)
-	c := &http.Client{Jar: jar, Timeout: 120 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
-	base := strings.TrimRight(*from, "/")
-	resp, err := c.PostForm(base+"/login", url.Values{"username": {*user}, "password": {*pass}})
+	st, err := OpenStore(filepath.Join(d.data, "state.json"))
 	if err != nil {
 		return err
+	}
+	defer st.Close()
+	nIn, nAcc, skipped, err := importFromPanel(st, *from, *user, *pass, *shift, *enable)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("imported %d inbounds and %d accounts (%d clients skipped: no password/email)\n", nIn, nAcc, skipped)
+	if !*enable {
+		fmt.Println("inbounds were created DISABLED: enable them in the panel when you are ready to switch")
+	}
+	return nil
+}
+
+// importFromPanel copies inbounds and accounts from a running vpn-ui panel into st.
+func importFromPanel(st *Store, from, user, pass string, shift int, enable bool) (nIn, nAcc, skipped int, err error) {
+	jar, _ := cookiejar.New(nil)
+	c := &http.Client{Jar: jar, Timeout: 120 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+	base := strings.TrimRight(from, "/")
+	resp, e0 := c.PostForm(base+"/login", url.Values{"username": {user}, "password": {pass}})
+	if e0 != nil {
+		return 0, 0, 0, e0
 	}
 	var lr envelope
 	json.NewDecoder(resp.Body).Decode(&lr)
 	resp.Body.Close()
 	if !lr.Success {
-		return fmt.Errorf("old panel login refused: %s", lr.Msg)
+		return 0, 0, 0, fmt.Errorf("old panel login refused: %s", lr.Msg)
 	}
 	req, _ := http.NewRequest("GET", base+"/panel/api/inbounds/list", nil)
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	resp, err = c.Do(req)
 	if err != nil {
-		return err
+		return 0, 0, 0, err
 	}
 	defer resp.Body.Close()
 	var list struct {
@@ -69,17 +87,11 @@ func importCmd(args []string) error {
 		} `json:"obj"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil || !list.Success {
-		return fmt.Errorf("could not read the inbound list (wrong URL/base path?)")
+		return 0, 0, 0, fmt.Errorf("could not read the inbound list (wrong URL/base path?)")
 	}
-	st, err := OpenStore(filepath.Join(d.data, "state.json"))
-	if err != nil {
-		return err
-	}
-	defer st.Close()
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	idMap := map[int]int{}
-	nIn, nAcc, skipped := 0, 0, 0
 	for _, o := range list.Obj {
 		if !protoOK[o.Protocol] {
 			continue
@@ -89,8 +101,8 @@ func importCmd(args []string) error {
 			continue
 		}
 		delete(set, "clients")
-		in := &Inbound{ID: st.st.NextInbound, Remark: o.Remark, Enable: o.Enable && *enable, Listen: o.Listen,
-			Port: o.Port + *shift, Protocol: o.Protocol, Settings: set}
+		in := &Inbound{ID: st.st.NextInbound, Remark: o.Remark, Enable: o.Enable && enable, Listen: o.Listen,
+			Port: o.Port + shift, Protocol: o.Protocol, Settings: set}
 		in.SortOrder = in.ID
 		st.st.NextInbound++
 		st.st.Inbounds[in.ID] = in
@@ -142,9 +154,5 @@ func importCmd(args []string) error {
 		}
 	}
 	st.touch()
-	fmt.Printf("imported %d inbounds and %d accounts (%d clients skipped: no password/email)\n", nIn, nAcc, skipped)
-	if !*enable {
-		fmt.Println("inbounds were created DISABLED: enable them in the panel when you are ready to switch")
-	}
-	return nil
+	return nIn, nAcc, skipped, nil
 }
