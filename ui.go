@@ -671,8 +671,15 @@ func (a *API) uiRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in State
-	if json.Unmarshal(body, &in) != nil || (in.Inbounds == nil && in.Accounts == nil) {
-		fail(w, "this is not a vpn-lite backup file")
+	if isSQLite(body) { // the .db backup of the old vpn-ui panel
+		st, _, err := stateFromVpnUiDB(body)
+		if err != nil {
+			fail(w, err.Error())
+			return
+		}
+		in = *st
+	} else if json.Unmarshal(body, &in) != nil || (in.Inbounds == nil && in.Accounts == nil) {
+		fail(w, "this is neither a vpn-lite backup (.json) nor a vpn-ui backup (.db)")
 		return
 	}
 	a.st.Flush()

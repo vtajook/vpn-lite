@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -594,5 +595,35 @@ func TestTelegramLoginNotice(t *testing.T) {
 	case m := <-got:
 		t.Fatalf("message sent although disabled: %q", m)
 	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+func TestVpnUiDBBackup(t *testing.T) {
+	b, err := os.ReadFile("testdata/vpnui_small.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, skipped, err := stateFromVpnUiDB(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Inbounds) != 2 || skipped != 1 || st.Inbounds[4] == nil || st.Inbounds[5] == nil || st.NextInbound != 6 {
+		t.Fatalf("inbounds: %d skipped %d next %d", len(st.Inbounds), skipped, st.NextInbound)
+	}
+	if st.Inbounds[4].Settings["connDomain"] != "l2tp.example.com" || st.Inbounds[4].Settings["ipsecPsk"] != "123456" || st.Inbounds[4].Settings["clients"] != nil {
+		t.Fatalf("l2tp settings: %v", st.Inbounds[4].Settings)
+	}
+	if st.Inbounds[5].Settings["caCert"] != "CA" || st.Inbounds[5].Settings["tlsCrypt"] != "TC" {
+		t.Fatalf("ovpn settings: %v", st.Inbounds[5].Settings)
+	}
+	if len(st.Accounts) != 400 {
+		t.Fatalf("accounts %d", len(st.Accounts))
+	}
+	a := st.Accounts["user10"]
+	if a == nil || a.Enable || a.Password != "pw10" || a.Username != "vpn10" || a.Up != 10000 || a.Down != 20000 || a.AllTime != 30000 || a.ExpiryTime != 1795017077000 || len(a.Inbounds) != 2 {
+		t.Fatalf("account: %+v", a)
+	}
+	if u := st.Accounts["user1"]; u.TotalGB != 5<<30 || len(u.Inbounds) != 2 { // pptp membership dropped
+		t.Fatalf("user1: %+v", u)
 	}
 }

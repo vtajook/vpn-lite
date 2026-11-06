@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -25,7 +26,29 @@ func importCmd(args []string) error {
 	pass := fs.String("pass", "", "old panel password")
 	shift := fs.Int("port-shift", 0, "add this to every imported inbound port (to run beside the old panel)")
 	enable := fs.Bool("enable", false, "create imported inbounds enabled")
+	dbFile := fs.String("db", "", "restore from a vpn-ui backup file (.db) instead of a running panel")
 	fs.Parse(args)
+	if *dbFile != "" {
+		b, err := os.ReadFile(*dbFile)
+		if err != nil {
+			return err
+		}
+		in, skipped, err := stateFromVpnUiDB(b)
+		if err != nil {
+			return err
+		}
+		st, err := OpenStore(filepath.Join(d.data, "state.json"))
+		if err != nil {
+			return err
+		}
+		defer st.Close()
+		st.mu.Lock()
+		st.st.Inbounds, st.st.Accounts, st.st.NextInbound = in.Inbounds, in.Accounts, in.NextInbound
+		st.touch()
+		st.mu.Unlock()
+		fmt.Printf("restored %d services and %d accounts (%d unsupported services skipped)\n", len(in.Inbounds), len(in.Accounts), skipped)
+		return nil
+	}
 	if *from == "" || *user == "" || *pass == "" {
 		return fmt.Errorf("-from, -user and -pass are required")
 	}
