@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -113,4 +114,46 @@ func (s *Store) BackupLoop(stop <-chan struct{}) {
 			Events.Add("info", "backup", "", "backup sent to Telegram")
 		}
 	}
+}
+
+var tgLastFail time.Time
+
+// TgNotify sends a short text message to the configured chat (asynchronously; errors are only logged).
+func (s *Store) TgNotify(text string) {
+	s.mu.RLock()
+	g := s.st.Global
+	s.mu.RUnlock()
+	if g.TgToken == "" || g.TgChat == "" {
+		return
+	}
+	go func() {
+		body := url.Values{"chat_id": {g.TgChat}, "text": {text}}
+		resp, err := (&http.Client{Timeout: 30 * time.Second}).PostForm(tgAPI+"/bot"+g.TgToken+"/sendMessage", body)
+		if err != nil {
+			Events.Add("error", "telegram", "", "%v", strings.ReplaceAll(err.Error(), g.TgToken, "***"))
+			return
+		}
+		resp.Body.Close()
+	}()
+}
+
+// NotifyLogin tells the admin about a panel login (successful, or failed at most once a minute).
+func (s *Store) NotifyLogin(okLogin bool, user, ip string) {
+	s.mu.RLock()
+	off := s.st.Global.TgNoLogin
+	s.mu.RUnlock()
+	if off {
+		return
+	}
+	host, _ := os.Hostname()
+	now := time.Now().Format("2006-01-02 15:04:05")
+	if okLogin {
+		s.TgNotify(fmt.Sprintf("🔐 Panel login\nserver: %s\nuser: %s\nIP: %s\ntime: %s", host, user, ip, now))
+		return
+	}
+	if time.Since(tgLastFail) < time.Minute {
+		return
+	}
+	tgLastFail = time.Now()
+	s.TgNotify(fmt.Sprintf("⚠️ Failed panel login\nserver: %s\nuser tried: %s\nIP: %s\ntime: %s", host, user, ip, now))
 }

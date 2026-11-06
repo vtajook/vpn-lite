@@ -103,10 +103,12 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	if !a.st.CheckAdmin(r.PostFormValue("username"), r.PostFormValue("password")) {
 		loginFailed(ip)
 		Events.Add("login-fail", "panel", r.PostFormValue("username"), "from %s", ip)
+		a.st.NotifyLogin(false, r.PostFormValue("username"), ip)
 		fail(w, "Wrong username or password")
 		return
 	}
 	a.st.issue(w, r.TLS != nil)
+	a.st.NotifyLogin(true, r.PostFormValue("username"), ip)
 	ok(w, "Login successful", nil)
 }
 

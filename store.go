@@ -90,6 +90,7 @@ type GlobalSettings struct {
 	TgToken       string `json:"tgToken"`
 	TgChat        string `json:"tgChat"`
 	TgBackupHours int    `json:"tgBackupHours"` // 0 = off
+	TgNoLogin     bool   `json:"tgNoLogin"`     // true = do not message panel logins
 }
 
 type Store struct {

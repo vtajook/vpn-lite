@@ -561,3 +561,38 @@ func TestTelegramBackup(t *testing.T) {
 		t.Fatalf("bad upload: chat=%q name=%q size=%d", gotChat, gotName, gotSize)
 	}
 }
+
+func TestTelegramLoginNotice(t *testing.T) {
+	got := make(chan string, 4)
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		got <- r.FormValue("text")
+		w.Write([]byte(`{"ok":true}`))
+	}))
+	defer fake.Close()
+	old := tgAPI
+	tgAPI = fake.URL
+	defer func() { tgAPI = old }()
+	st := testStore(t)
+	st.mu.Lock()
+	st.st.Global.TgToken, st.st.Global.TgChat = "T", "1"
+	st.mu.Unlock()
+	st.NotifyLogin(true, "admin", "1.2.3.4")
+	select {
+	case m := <-got:
+		if !strings.Contains(m, "admin") || !strings.Contains(m, "1.2.3.4") {
+			t.Fatalf("message lacks user/ip: %q", m)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("no login message sent")
+	}
+	st.mu.Lock()
+	st.st.Global.TgNoLogin = true
+	st.mu.Unlock()
+	st.NotifyLogin(true, "admin", "1.2.3.4")
+	select {
+	case m := <-got:
+		t.Fatalf("message sent although disabled: %q", m)
+	case <-time.After(300 * time.Millisecond):
+	}
+}
