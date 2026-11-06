@@ -77,6 +77,8 @@ func (a *API) uiRoutes(mux *http.ServeMux) {
 	u("POST", "/settings", a.uiSetSettings)
 	u("POST", "/password", a.uiPassword)
 	u("POST", "/certs/{id}", a.uiCerts)
+	u("POST", "/certIssue/{id}", a.uiCertIssue)
+	u("GET", "/certStatus/{id}", a.uiCertStatus)
 	u("GET", "/backup", a.uiBackup)
 	u("POST", "/restart", a.uiRestart)
 	u("POST", "/restore", a.uiRestore)

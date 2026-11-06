@@ -61,3 +61,45 @@ func genCerts(cn string) (certBundle, error) {
 	out.TlsCrypt = b.String()
 	return out, nil
 }
+
+func cloneSettings(m map[string]any) map[string]any {
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
+// ensureOvpnCerts creates the CA, server certificate and tls-crypt key of an OpenVPN inbound
+// when it has none. It reports whether certificates exist afterwards.
+func (s *Store) ensureOvpnCerts(id int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	in := s.st.Inbounds[id]
+	if in == nil || in.Protocol != "openvpn" {
+		return false
+	}
+	if strSetting(in.Settings, "caCert", "") != "" && strSetting(in.Settings, "serverCert", "") != "" {
+		return true
+	}
+	cn := strings.TrimSpace(strSetting(in.Settings, "connDomain", ""))
+	if cn == "" {
+		cn = strings.TrimSpace(in.Listen)
+	}
+	if cn == "" || cn == "0.0.0.0" {
+		cn = "vpn-lite"
+	}
+	cb, err := genCerts(cn)
+	if err != nil {
+		return false
+	}
+	if in.Settings == nil {
+		in.Settings = map[string]any{}
+	}
+	in.Settings["caCert"], in.Settings["caKey"] = cb.CaCert, cb.CaKey
+	in.Settings["serverCert"], in.Settings["serverKey"] = cb.ServerCert, cb.ServerKey
+	in.Settings["tlsCrypt"] = cb.TlsCrypt
+	s.touch()
+	Events.Add("info", "openvpn", "", "inbound %d: created certificates for %s", id, cn)
+	return true
+}

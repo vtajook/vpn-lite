@@ -320,12 +320,12 @@ func TestBotAPIContract(t *testing.T) {
 	if _, tr = get("/panel/api/inbounds/getClientTraffics/bob1"); tr["success"] != false {
 		t.Fatal("account should be gone")
 	}
-	// .ovpn needs certs first
+	// .ovpn must work without any manual certificate step: they are created on demand
 	resp, _ := c.Get(ts.URL + "/panel/api/inbounds/1/ovpn/udp")
-	var m map[string]any
-	jsonDecode(resp, &m)
-	if m["success"] != false {
-		t.Fatalf("ovpn without certs should fail: %v", m)
+	bb, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(bb), "BEGIN CERTIFICATE") || !strings.Contains(string(bb), "remote ") {
+		t.Fatalf("ovpn should be generated with auto certs: %.200s", body)
 	}
 }
 

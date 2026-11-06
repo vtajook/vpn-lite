@@ -75,15 +75,30 @@ func transports(in *Inbound) []string {
 // Reconcile makes the running daemons match the store. Cheap and idempotent: it only
 // restarts a daemon whose generated config actually changed.
 func (m *OvpnManager) Reconcile() {
-	m.st.mu.RLock()
-	want := map[string]*Inbound{}
-	for _, in := range m.st.st.Inbounds {
-		if in.Protocol == "openvpn" && in.Enable {
-			c := *in
-			want[fmt.Sprint(in.ID)] = &c
+	collect := func() (map[string]*Inbound, []int) {
+		m.st.mu.RLock()
+		defer m.st.mu.RUnlock()
+		want := map[string]*Inbound{}
+		var need []int
+		for _, in := range m.st.st.Inbounds {
+			if in.Protocol == "openvpn" && in.Enable {
+				c := *in
+				c.Settings = cloneSettings(in.Settings)
+				want[fmt.Sprint(in.ID)] = &c
+				if strSetting(in.Settings, "serverCert", "") == "" || strSetting(in.Settings, "caCert", "") == "" {
+					need = append(need, in.ID)
+				}
+			}
 		}
+		return want, need
 	}
-	m.st.mu.RUnlock()
+	want, need := collect()
+	for _, id := range need { // a new inbound has no certificates yet: make them, nobody should have to click for it
+		m.st.ensureOvpnCerts(id)
+	}
+	if len(need) > 0 {
+		want, _ = collect()
+	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()

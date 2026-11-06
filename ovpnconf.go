@@ -152,6 +152,7 @@ func ovpnServerConfig(in *Inbound, proto, dir, runDir string) string {
 func (a *API) ovpnFile(w http.ResponseWriter, r *http.Request) {
 	proto := r.PathValue("proto")
 	user, pass, base := "", "", ""
+	a.st.ensureOvpnCerts(pathID(r)) // an inbound that was never started has no certificates yet
 	a.st.mu.RLock()
 	in := a.st.st.Inbounds[pathID(r)]
 	if q := strings.TrimSpace(r.URL.Query().Get("user")); q != "" && in != nil {
