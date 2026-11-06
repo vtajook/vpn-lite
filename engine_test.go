@@ -396,3 +396,25 @@ func TestPortClash(t *testing.T) {
 		t.Fatalf("ports %v", got)
 	}
 }
+
+func TestOvpnProfileBothWithCreds(t *testing.T) {
+	in := &Inbound{ID: 3, Port: 1001, Listen: "", Settings: map[string]any{
+		"caCert": "CA", "connDomain": "vpn.example.com", "udpEnable": true, "tcpEnable": true,
+		"separatePorts": true, "tcpPort": float64(1003)}}
+	cfg, err := ovpnClientConfig(in, "both", "panel:2096", "bob", "pw12345678")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"remote vpn.example.com 1001 udp", "remote vpn.example.com 1003 tcp",
+		"<auth-user-pass>\nbob\npw12345678\n</auth-user-pass>"} {
+		if !strings.Contains(cfg, want) {
+			t.Errorf("profile lacks %q:\n%s", want, cfg)
+		}
+	}
+	if strings.Contains(cfg, "explicit-exit-notify") {
+		t.Error("explicit-exit-notify must not be used with mixed transports")
+	}
+	if strings.Index(cfg, "udp") > strings.Index(cfg, "1003 tcp") {
+		t.Error("UDP remote must come first")
+	}
+}

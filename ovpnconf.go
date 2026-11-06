@@ -151,20 +151,33 @@ func ovpnServerConfig(in *Inbound, proto, dir, runDir string) string {
 
 func (a *API) ovpnFile(w http.ResponseWriter, r *http.Request) {
 	proto := r.PathValue("proto")
+	user, pass, base := "", "", ""
 	a.st.mu.RLock()
 	in := a.st.st.Inbounds[pathID(r)]
+	if q := strings.TrimSpace(r.URL.Query().Get("user")); q != "" && in != nil {
+		if acc := a.st.accountByIdentityLocked(in.ID, q); acc != nil && hasInt(acc.Inbounds, in.ID) {
+			user, pass, base = acc.Username, acc.Password, safeName(acc.Username, in.ID)
+		}
+	}
 	a.st.mu.RUnlock()
 	if in == nil || in.Protocol != "openvpn" {
 		fail(w, "Inbound not found")
 		return
 	}
-	cfg, err := ovpnClientConfig(in, proto, r.Host)
+	cfg, err := ovpnClientConfig(in, proto, r.Host, user, pass)
 	if err != nil {
 		fail(w, err.Error())
 		return
 	}
+	name := safeName(in.Remark, in.ID)
+	if base != "" {
+		name = base
+	}
+	if proto != "both" && proto != "all" {
+		name += "-" + proto
+	}
 	w.Header().Set("Content-Type", "application/x-openvpn-profile")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%s.ovpn"`, safeName(in.Remark, in.ID), proto))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.ovpn"`, name))
 	w.Write([]byte(cfg))
 }
 
@@ -181,28 +194,38 @@ func safeName(remark string, id int) string {
 	return b.String()
 }
 
-func ovpnClientConfig(in *Inbound, proto, reqHost string) (string, error) {
+// ovpnClientConfig builds a client profile. proto is "udp", "tcp" or "both" (UDP first, TCP as
+// fallback in one file). When user is set, the credentials are embedded in the profile.
+func ovpnClientConfig(in *Inbound, proto, reqHost, user, pass string) (string, error) {
 	s := in.Settings
-	if proto != "udp" && proto != "tcp" {
-		return "", fmt.Errorf("proto must be udp or tcp")
+	if proto == "all" {
+		proto = "both"
 	}
-	if proto == "udp" && !boolSetting(s, "udpEnable", true) {
+	if proto != "udp" && proto != "tcp" && proto != "both" {
+		return "", fmt.Errorf("proto must be udp, tcp or both")
+	}
+	udpOn, tcpOn := boolSetting(s, "udpEnable", true), boolSetting(s, "tcpEnable", true)
+	if proto == "both" {
+		switch {
+		case udpOn && !tcpOn:
+			proto = "udp"
+		case tcpOn && !udpOn:
+			proto = "tcp"
+		}
+	}
+	if proto == "udp" && !udpOn {
 		return "", fmt.Errorf("UDP transport is disabled for this inbound")
 	}
-	if proto == "tcp" && !boolSetting(s, "tcpEnable", true) {
+	if proto == "tcp" && !tcpOn {
 		return "", fmt.Errorf("TCP transport is disabled for this inbound")
 	}
 	ca := strings.TrimSpace(strSetting(s, "caCert", ""))
 	if ca == "" {
 		return "", fmt.Errorf("no CA certificate: generate certificates for this inbound first")
 	}
-	port := in.Port
-	if proto == "tcp" {
-		port = tcpPort(in)
-	}
 	type remote struct {
 		host string
-		port int
+		port int // 0 = the inbound's own port for that transport
 	}
 	var remotes []remote
 	if arr, ok := s["externalProxy"].([]any); ok {
@@ -212,11 +235,7 @@ func ovpnClientConfig(in *Inbound, proto, reqHost string) (string, error) {
 			if d == "" {
 				continue
 			}
-			p := intSetting(m, "port", 0)
-			if p == 0 {
-				p = port
-			}
-			remotes = append(remotes, remote{d, p})
+			remotes = append(remotes, remote{d, intSetting(m, "port", 0)})
 		}
 	}
 	if len(remotes) == 0 {
@@ -233,26 +252,46 @@ func ovpnClientConfig(in *Inbound, proto, reqHost string) (string, error) {
 		if h == "" {
 			return "", fmt.Errorf("could not determine server address; set an external proxy destination")
 		}
-		remotes = append(remotes, remote{h, port})
+		remotes = append(remotes, remote{h, 0})
 	}
 	ciphers := ciphersOf(s)
 	var b strings.Builder
 	w := func(f string, a ...any) { fmt.Fprintf(&b, f+"\n", a...) }
 	w("client")
 	w("dev tun")
-	w("proto %s", proto)
-	for _, r := range remotes {
-		w("remote %s %d", r.host, r.port)
+	transports := []string{proto}
+	if proto == "both" {
+		transports = []string{"udp", "tcp"}
+	}
+	for _, tr := range transports {
+		for _, r := range remotes {
+			p := r.port
+			if p == 0 {
+				p = in.Port
+				if tr == "tcp" {
+					p = tcpPort(in)
+				}
+			}
+			w("remote %s %d %s", r.host, p, tr)
+		}
+	}
+	if proto == "both" {
+		w("connect-retry 2")
+		w("connect-timeout 10")
 	}
 	w("resolv-retry infinite")
 	w("nobind")
 	w("persist-key")
 	w("persist-tun")
-	if proto == "udp" {
+	if proto == "udp" { // only valid when every remote is UDP
 		w("explicit-exit-notify 3")
 	}
 	w("remote-cert-tls server")
-	w("auth-user-pass")
+	if user != "" {
+		w("<auth-user-pass>\n%s\n%s\n</auth-user-pass>", user, pass)
+	} else {
+		w("auth-user-pass")
+	}
 	w("setenv CLIENT_CERT 0")
 	if in.Remark != "" {
 		w("setenv FRIENDLY_NAME %q", in.Remark)
