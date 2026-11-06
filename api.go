@@ -71,10 +71,11 @@ func (a *API) Handler() http.Handler {
 
 	a.uiRoutes(mux)
 
-	if a.base == "/" || a.base == "" {
-		return mux
+	var h http.Handler = mux
+	if a.base != "/" && a.base != "" {
+		h = http.StripPrefix(strings.TrimSuffix(a.base, "/"), mux)
 	}
-	return http.StripPrefix(strings.TrimSuffix(a.base, "/"), mux)
+	return gzipMW(h)
 }
 
 // api guards a handler: no cookie => bare 404 (hides the endpoints, like the old panel).
@@ -91,7 +92,17 @@ func (a *API) api(h http.HandlerFunc) http.HandlerFunc {
 
 func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
+	ip := r.RemoteAddr
+	if i := strings.LastIndexByte(ip, ':'); i > 0 {
+		ip = ip[:i]
+	}
+	if !loginAllowed(ip) {
+		fail(w, "Too many failed attempts; try again in a few minutes")
+		return
+	}
 	if !a.st.CheckAdmin(r.PostFormValue("username"), r.PostFormValue("password")) {
+		loginFailed(ip)
+		Events.Add("login-fail", "panel", r.PostFormValue("username"), "from %s", ip)
 		fail(w, "Wrong username or password")
 		return
 	}

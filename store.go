@@ -70,6 +70,8 @@ type State struct {
 
 type GlobalSettings struct {
 	BasePath       string `json:"basePath"`       // "/" or "/abc/"
+	Port           int    `json:"port"`           // panel listen port
+	Bind           string `json:"bind"`           // panel listen address (empty = all)
 	SessionMinutes int    `json:"sessionMinutes"` // cookie lifetime
 	// Policy for an account's device cap (Account.LimitIP, or inbound userLimit).
 	// "reject": a new login is refused while the cap is full.

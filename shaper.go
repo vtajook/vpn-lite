@@ -92,7 +92,13 @@ func minorOf(vip string) int {
 
 // Apply installs the limits of the session's account (or clears them when both are 0).
 func (s *shaper) Apply(sess *Session) {
-	if s.st == nil || sess == nil || sess.VIP == "" {
+	if s.st == nil || sess == nil {
+		return
+	}
+	Sessions.mu.Lock()
+	vip, dev := sess.VIP, sess.Dev
+	Sessions.mu.Unlock()
+	if vip == "" {
 		return
 	}
 	s.st.mu.RLock()
@@ -102,11 +108,12 @@ func (s *shaper) Apply(sess *Session) {
 		down, up = acc.SpeedDown, acc.SpeedUp
 	}
 	s.st.mu.RUnlock()
-	vip, dev := sess.VIP, sess.Dev
 	s.submit(func() {
 		if dev == "" {
 			dev = s.route(vip)
+			Sessions.mu.Lock()
 			sess.Dev = dev
+			Sessions.mu.Unlock()
 		}
 		if dev == "" {
 			return
@@ -120,10 +127,15 @@ func (s *shaper) Apply(sess *Session) {
 }
 
 func (s *shaper) Remove(sess *Session) {
-	if sess == nil || sess.VIP == "" || sess.Dev == "" || !isSharedDev(sess.Dev) {
+	if sess == nil {
+		return
+	}
+	Sessions.mu.Lock()
+	dev, vip := sess.Dev, sess.VIP
+	Sessions.mu.Unlock()
+	if vip == "" || dev == "" || !isSharedDev(dev) {
 		return // dedicated devices disappear with the session
 	}
-	dev, vip := sess.Dev, sess.VIP
 	s.submit(func() { s.clearShared(dev, vip) })
 }
 

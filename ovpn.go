@@ -342,8 +342,10 @@ func (i *ovpnInst) dispatch(evt, cid, kid string, env map[string]string) {
 		i.send(`client-deny %s %s "%s" "%s"`, cid, kid, strings.ReplaceAll(reason, `"`, ""), "AUTH_FAILED")
 	case "ESTABLISHED":
 		if s := Sessions.Get(i.sid(cid)); s != nil {
+			Sessions.mu.Lock()
 			s.VIP = env["ifconfig_pool_remote_ip"]
 			s.Dev = fmt.Sprintf("vl%d%s", i.id, i.proto[:1])
+			Sessions.mu.Unlock()
 			Events.Add("connect", "openvpn-"+i.proto, s.Email, "ip=%s src=%s cipher=%s", s.VIP, s.SrcIP, env["IV_CIPHERS"])
 			Shaper.Apply(s)
 		}
