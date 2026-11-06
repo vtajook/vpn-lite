@@ -58,7 +58,7 @@ const T = {
   page:"Page",of:"of",sessions:"Sessions",onlineu:"Online users",cpu:"CPU",mem:"Memory",net:"Network",members:"accounts",port:"Port",remark:"Name",proto:"Protocol",
   gen:"Generate certificates",newin:"Add inbound",count:"How many",prefix:"Prefix",created:"Created",copy:"Copy",time:"Time",kind:"Kind",detail:"Detail",
   strategy:"When the device limit is full",evict:"Disconnect the oldest device",reject:"Refuse the new login",grace:"Never evict a session younger than (sec)",
-  chpw:"Change password",bk:"Backup & restore",tgb:"Automatic backup to Telegram",tgbhelp:"Create a bot with @BotFather, send it any message, then enter its token and your numeric chat id. The panel sends the backup file every N hours (0 = off). Use a bot of your own, not the sales bot.",tgtoken:"Bot token",tgchat:"Chat id (your numeric id)",tghours:"Send every (hours, 0 = off)",tgnow:"Send a backup now",tglogin:"Message me on every panel login",tgcpu:"CPU alert above % (0 = off)",tgsent:"Backup sent to Telegram",bkhelp:"Download everything (services, accounts, usage) as one file, or restore it on this or another server. Panel login/port/certificate are kept.",restore:"Restore from file",restoreconf:"Replace ALL current accounts and services with the ones in this file?",imp:"Import from old panel (vpn-ui)",imphelp:"Moves services and accounts directly from a running vpn-ui panel. The old panel is only read, never changed.",impurl:"Old panel address (with base path)",pass:"Password",shift:"Add to every port (to run side by side)",impen:"Create services enabled",impreq:"Address, username and password are required",impgo:"Import now",oldpw:"Current password",newpw:"New password (8+)",backup:"Download backup",restart:"Restart panel",tls:"HTTPS certificate path",tlsk:"HTTPS key path",
+  chpw:"Change password",domreq:"Connection domain is required for Cisco (the SSL certificate is issued for it)",certwait:"Getting the SSL certificate...",certget:"SSL certificate for",certsave:"✓ Save the service",certsaveanyway:"Save anyway (self-signed certificate)",back:"Back",bk:"Backup & restore",tgb:"Automatic backup to Telegram",tgbhelp:"Create a bot with @BotFather, send it any message, then enter its token and your numeric chat id. The panel sends the backup file every N hours (0 = off). Use a bot of your own, not the sales bot.",tgtoken:"Bot token",tgchat:"Chat id (your numeric id)",tghours:"Send every (hours, 0 = off)",tgnow:"Send a backup now",tglogin:"Message me on every panel login",tgcpu:"CPU alert above % (0 = off)",tgsent:"Backup sent to Telegram",bkhelp:"Download everything (services, accounts, usage) as one file, or restore it on this or another server. Panel login/port/certificate are kept.",restore:"Restore from file",restoreconf:"Replace ALL current accounts and services with the ones in this file?",imp:"Import from old panel (vpn-ui)",imphelp:"Moves services and accounts directly from a running vpn-ui panel. The old panel is only read, never changed.",impurl:"Old panel address (with base path)",pass:"Password",shift:"Add to every port (to run side by side)",impen:"Create services enabled",impreq:"Address, username and password are required",impgo:"Import now",oldpw:"Current password",newpw:"New password (8+)",backup:"Download backup",restart:"Restart panel",tls:"HTTPS certificate path",tlsk:"HTTPS key path",
   basep:"Base path",adv:"Advanced settings (JSON)",lang:"فارسی",theme:"Theme",logout:"Sign out",sort:"Sort",name:"Name",lastseen:"Last seen",today:"Used today",dns:"DNS",mtu:"MTU",
   portudp:"OpenVPN UDP port",porttcp:"OpenVPN TCP port",useudp:"UDP enabled",usetcp:"TCP enabled",portoc:"Cisco port (TCP + UDP)",portl2:"L2TP port",ipsecon:"IPsec enabled (phones)",condom:"Connection domain/IP (given to clients)",psk:"IPsec pre-shared key",pskreq:"Enter the IPsec pre-shared key (or turn IPsec off)",ipsec:"IPsec PSK (phones)",pool:"Tunnel pool",udp:"UDP",tcp:"TCP",tcpport:"TCP port",ext:"Server address for clients",sub:"Config",listen:"Listen address",
   full:"Device limit reached",none:"Nothing here yet",single:"One protocol at a time",singleh:"The account is served on all selected protocols, but can be connected through only one of them at a time.",defsingle:"Default for accounts created by the bot / API"},
@@ -70,7 +70,7 @@ const T = {
   page:"صفحه",of:"از",sessions:"اتصال‌ها",onlineu:"کاربر آنلاین",cpu:"پردازنده",mem:"حافظه",net:"شبکه",members:"اکانت",port:"پورت",remark:"نام",proto:"پروتکل",
   gen:"ساخت گواهی",newin:"سرویس جدید",count:"تعداد",prefix:"پیشوند",created:"ساخته شد",copy:"کپی",time:"زمان",kind:"نوع",detail:"جزئیات",
   strategy:"وقتی سقف دستگاه پر شد",evict:"قدیمی‌ترین دستگاه قطع شود",reject:"ورود جدید رد شود",grace:"سشن جوان‌تر از (ثانیه) قطع نشود",
-  chpw:"تغییر رمز",bk:"بکاپ و بازیابی",tgb:"بکاپ خودکار در تلگرام",tgbhelp:"با @BotFather یک ربات بساز، یک پیام برایش بفرست، بعد توکن آن و آیدی عددی خودت را وارد کن. پنل هر N ساعت فایل بکاپ را می‌فرستد (۰ = خاموش). یک ربات جدا بساز، نه ربات فروش.",tgtoken:"توکن ربات",tgchat:"آیدی چت (آیدی عددی خودت)",tghours:"ارسال هر چند ساعت (۰ = خاموش)",tgnow:"همین حالا بکاپ بفرست",tglogin:"با هر ورود به پنل برایم پیام بفرست",tgcpu:"هشدار مصرف CPU بالای ٪ (۰ = خاموش)",tgsent:"بکاپ در تلگرام ارسال شد",bkhelp:"همه‌چیز (سرویس‌ها، اکانت‌ها، مصرف) را در یک فایل دانلود کن، یا روی همین سرور یا سرور دیگر بازیابی کن. یوزر/پورت/گواهی پنل عوض نمی‌شود.",restore:"بازیابی از فایل",restoreconf:"همه اکانت‌ها و سرویس‌های فعلی با محتوای این فایل جایگزین شوند؟",imp:"انتقال از پنل قدیمی (vpn-ui)",imphelp:"سرویس‌ها و اکانت‌ها را مستقیم از یک پنل vpn-ui در حال اجرا می‌آورد. پنل قدیمی فقط خوانده می‌شود و تغییری نمی‌کند.",impurl:"آدرس پنل قدیمی (با مسیر پایه)",pass:"رمز",shift:"اضافه شدن به هر پورت (برای اجرای هم‌زمان)",impen:"سرویس‌ها فعال ساخته شوند",impreq:"آدرس، یوزر و رمز لازم است",impgo:"انتقال بده",oldpw:"رمز فعلی",newpw:"رمز جدید (حداقل ۸)",backup:"دانلود بکاپ",restart:"ری‌استارت پنل",tls:"مسیر گواهی HTTPS",tlsk:"مسیر کلید HTTPS",
+  chpw:"تغییر رمز",domreq:"برای Cisco دامنه اتصال اجباری است (گواهی SSL برای آن گرفته می‌شود)",certwait:"در حال گرفتن گواهی SSL...",certget:"گواهی SSL برای",certsave:"✓ ذخیره سرویس",certsaveanyway:"با این حال ذخیره کن (گواهی خودامضا)",back:"برگشت",bk:"بکاپ و بازیابی",tgb:"بکاپ خودکار در تلگرام",tgbhelp:"با @BotFather یک ربات بساز، یک پیام برایش بفرست، بعد توکن آن و آیدی عددی خودت را وارد کن. پنل هر N ساعت فایل بکاپ را می‌فرستد (۰ = خاموش). یک ربات جدا بساز، نه ربات فروش.",tgtoken:"توکن ربات",tgchat:"آیدی چت (آیدی عددی خودت)",tghours:"ارسال هر چند ساعت (۰ = خاموش)",tgnow:"همین حالا بکاپ بفرست",tglogin:"با هر ورود به پنل برایم پیام بفرست",tgcpu:"هشدار مصرف CPU بالای ٪ (۰ = خاموش)",tgsent:"بکاپ در تلگرام ارسال شد",bkhelp:"همه‌چیز (سرویس‌ها، اکانت‌ها، مصرف) را در یک فایل دانلود کن، یا روی همین سرور یا سرور دیگر بازیابی کن. یوزر/پورت/گواهی پنل عوض نمی‌شود.",restore:"بازیابی از فایل",restoreconf:"همه اکانت‌ها و سرویس‌های فعلی با محتوای این فایل جایگزین شوند؟",imp:"انتقال از پنل قدیمی (vpn-ui)",imphelp:"سرویس‌ها و اکانت‌ها را مستقیم از یک پنل vpn-ui در حال اجرا می‌آورد. پنل قدیمی فقط خوانده می‌شود و تغییری نمی‌کند.",impurl:"آدرس پنل قدیمی (با مسیر پایه)",pass:"رمز",shift:"اضافه شدن به هر پورت (برای اجرای هم‌زمان)",impen:"سرویس‌ها فعال ساخته شوند",impreq:"آدرس، یوزر و رمز لازم است",impgo:"انتقال بده",oldpw:"رمز فعلی",newpw:"رمز جدید (حداقل ۸)",backup:"دانلود بکاپ",restart:"ری‌استارت پنل",tls:"مسیر گواهی HTTPS",tlsk:"مسیر کلید HTTPS",
   basep:"مسیر پایه",adv:"تنظیمات پیشرفته (JSON)",lang:"English",theme:"تم",logout:"خروج",sort:"مرتب‌سازی",name:"نام",lastseen:"آخرین اتصال",today:"مصرف امروز",dns:"DNS",mtu:"MTU",
   portudp:"پورت UDP اوپن‌وی‌پی‌ان",porttcp:"پورت TCP اوپن‌وی‌پی‌ان",useudp:"UDP فعال",usetcp:"TCP فعال",portoc:"پورت سیسکو (TCP و UDP)",portl2:"پورت L2TP",ipsecon:"IPsec فعال (گوشی)",condom:"دامنه/آی‌پی اتصال (به کاربر داده می‌شود)",psk:"کلید IPsec (pre-shared key)",pskreq:"کلید IPsec رو وارد کن (یا IPsec رو خاموش کن)",ipsec:"کلید IPsec (گوشی)",pool:"محدوده تونل",udp:"UDP",tcp:"TCP",tcpport:"پورت TCP",ext:"آدرس سرور برای کاربران",sub:"کانفیگ",listen:"آدرس شنود",
   full:"سقف دستگاه پر است",none:"چیزی نیست",single:"فقط با یک پروتکل همزمان",singleh:"اکانت روی همه‌ی پروتکل‌های انتخاب‌شده فعال است ولی هر لحظه فقط با یکی از آن‌ها می‌شود وصل بود.",defsingle:"پیش‌فرض برای اکانت‌هایی که ربات / API می‌سازد"}
@@ -243,6 +243,8 @@ function inboundModal(i){const isNew=!i;const raw=i?JSON.parse(i.settings):{};de
   !isNew&&i.protocol!=="l2tp"&&h("button",{class:"btn",onclick:async()=>{if(!confirm(t("confirm")))return;await post("panel/ui/certs/"+i.id+"?cn="+encodeURIComponent(raw.connDomain||location.hostname));toast(t("saved"))}},t("gen")),
   h("button",{class:"btn",onclick:()=>m.remove()},t("cancel")),
   h("button",{class:"btn p",onclick:async()=>{let s;try{s=JSON.parse(f.adv.value||"{}")}catch(e){toast("JSON",1);return}
+   const isCisco=proto.value==="openconnect";
+   if(isCisco&&!f.dom.value.trim()){toast(t("domreq"),1);return}
    const base=isNew?{}:{...raw};
    const merged={...base,...s};
    merged.connDomain=f.dom.value.trim();{const mv=parseInt(f.mtu.value);if(mv>0)merged.mtu=mv;else delete merged.mtu}
@@ -253,8 +255,21 @@ function inboundModal(i){const isNew=!i;const raw=i?JSON.parse(i.settings):{};de
    if(proto.value==="openvpn"){merged.udpEnable=f.udp.checked;merged.tcpEnable=f.tcpOn.checked;
     const tp=+f.tcp.value;if(tp>0&&tp!==+f.port.value){merged.separatePorts=true;merged.tcpPort=tp}else{merged.separatePorts=false;delete merged.tcpPort}}
    const o={remark:f.remark.value,enable:f.en.checked,port:f.port.value,listen:f.listen.value,protocol:proto.value,settings:JSON.stringify({clients:[],...merged}),streamSettings:"{}",sniffing:"{}"};
-   const r=await form("panel/api/inbounds/"+(isNew?"add":"update/"+i.id),o);
-   if(!r.success){toast(r.msg,1);return}toast(t("saved"));m.remove();render()}},t("save"))]);sync()}
+   const doSave=async()=>{const r=await form("panel/api/inbounds/"+(isNew?"add":"update/"+i.id),o);
+    if(!r.success){toast(r.msg,1);return}toast(t("saved"));m.remove();render()};
+   if(!isCisco){await doSave();return}
+   // Cisco/AnyConnect needs a TLS certificate: get one for the domain first and show the log
+   const logBox=h("pre",{style:"max-height:46vh;overflow:auto;direction:ltr;text-align:left"},t("certwait"));
+   const btns=h("div",{class:"row"});
+   const lm=modal(t("certget")+" "+merged.connDomain,h("div",{},logBox,btns),[]);
+   let res;try{res=await call("panel/ui/issueCert",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({domain:merged.connDomain})})}catch(e){res={ok:false,log:e.message}}
+   logBox.textContent=res.log;
+   btns.replaceChildren(
+    h("button",{class:"btn p",onclick:async()=>{lm.remove();await doSave()}},res.ok?t("certsave"):t("certsaveanyway")),
+    h("button",{class:"btn",onclick:()=>lm.remove()},t("back")))
+  }},t("save"))]);sync()}
+
+
 
 /* ---------- online / logs ---------- */
 async function pOnline(c){
@@ -301,7 +316,7 @@ async function pSettings(c){const s=await call("panel/ui/settings");const g=s.gl
    h("button",{class:"btn p",onclick:async()=>{
      if(!im.u.value||!im.n.value||!im.p.value){toast(t("impreq"),1);return}
      toast("…");
-     try{const r=await post("panel/ui/import",{url:im.u.value.trim(),user:im.n.value.trim(),pass:im.p.value,portShift:+im.s.value||0,enable:im.e.checked});toast(r.msg||t("saved"));im.p.value=""}catch(e){toast(e.message,1)}
+     try{const j=await api("panel/ui/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:im.u.value.trim(),user:im.n.value.trim(),pass:im.p.value,portShift:+im.s.value||0,enable:im.e.checked})});toast(j.msg||"error",!j.success);if(j.success)im.p.value=""}catch(e){toast(e.message,1)}
    }},t("impgo"))),
   h("div",{class:"card"},h("button",{class:"btn d",onclick:async()=>{if(!confirm(t("confirm")))return;await post("panel/ui/restart");toast("…");setTimeout(()=>location.reload(),3500)}},t("restart"))))}
 
