@@ -83,9 +83,12 @@ type GlobalSettings struct {
 	LimitStrategy string `json:"limitStrategy"`
 	EvictGraceSec int    `json:"evictGraceSec"`
 	// DefaultSingleProto applies to accounts created through the API without an explicit value (the bot).
-	DefaultSingleProto bool   `json:"defaultSingleProto"`
-	TLSCert            string `json:"tlsCert"` // panel HTTPS certificate path (empty = HTTP or self-signed)
-	TLSKey             string `json:"tlsKey"`
+	DefaultSingleProto bool `json:"defaultSingleProto"`
+	// AllowMultiProto lets one account be connected on several protocols at the same time.
+	// Off (the default): while an account is connected on one protocol, a login on another is refused.
+	AllowMultiProto bool   `json:"allowMultiProto"`
+	TLSCert         string `json:"tlsCert"` // panel HTTPS certificate path (empty = HTTP or self-signed)
+	TLSKey          string `json:"tlsKey"`
 	// Scheduled backup to a Telegram bot.
 	TgToken       string `json:"tgToken"`
 	TgChat        string `json:"tgChat"`

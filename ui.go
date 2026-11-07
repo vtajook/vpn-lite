@@ -461,6 +461,7 @@ func (a *API) uiSetSettings(w http.ResponseWriter, r *http.Request) {
 	cur := &a.st.st.Global
 	cur.LimitStrategy, cur.EvictGraceSec = g.LimitStrategy, g.EvictGraceSec
 	cur.DefaultSingleProto = g.DefaultSingleProto
+	cur.AllowMultiProto = g.AllowMultiProto
 	if g.SessionMinutes > 0 {
 		cur.SessionMinutes = g.SessionMinutes
 	}
@@ -711,7 +712,7 @@ func (a *API) uiRestore(w http.ResponseWriter, r *http.Request) {
 	}
 	a.st.rebaseTotalLocked()
 	g := &a.st.st.Global
-	g.LimitStrategy, g.EvictGraceSec, g.DefaultSingleProto = in.Global.LimitStrategy, in.Global.EvictGraceSec, in.Global.DefaultSingleProto
+	g.LimitStrategy, g.EvictGraceSec, g.DefaultSingleProto, g.AllowMultiProto = in.Global.LimitStrategy, in.Global.EvictGraceSec, in.Global.DefaultSingleProto, in.Global.AllowMultiProto
 	if g.LimitStrategy == "" {
 		g.LimitStrategy = "evict"
 	}

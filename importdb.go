@@ -115,6 +115,10 @@ func stateFromVpnUiDB(data []byte) (*State, int, error) {
 			a.Up, a.Down, a.AllTime = asInt(g(tc, x, "up")), asInt(g(tc, x, "down")), asInt(g(tc, x, "all_time"))
 			a.LastOnline = asInt(g(tc, x, "last_online"))
 		}
+		if a.Reset > 0 { // keep the reset schedule: next reset at the next cycle boundary, not right away
+			period := int64(a.Reset) * 86400000
+			a.LastReset = a.CreatedAt + (nowMs()-a.CreatedAt)/period*period
+		}
 		st.Accounts[ekey(email)] = a
 		byID[asInt(g(ta, r, "id"))] = a
 	}

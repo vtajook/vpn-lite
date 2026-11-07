@@ -202,16 +202,15 @@ func (s *Store) AuthorizeFn(inboundID int, user string, verify func(stored strin
 		return ""
 	}
 	same := live
-	if res.Single {
-		// one protocol at a time: sessions on any OTHER protocol are in the way
+	if res.Single || !g.AllowMultiProto {
+		// one protocol at a time: while the account is connected on another protocol, the
+		// new protocol is refused outright (the running connection is never disturbed)
 		same = nil
 		for _, s := range live {
 			if protoFamily(s.Proto) == res.Family {
 				same = append(same, s)
-			} else if why := canEvict(s); why != "" {
-				return deny("account is connected on another protocol; " + why)
 			} else {
-				evict = append(evict, s)
+				return deny("account is already connected on another protocol")
 			}
 		}
 	}
@@ -279,20 +278,26 @@ func (s *Store) EnforceLoop(stop <-chan struct{}) {
 			return
 		case <-t.C:
 		}
-		now := nowMs()
-		seen := map[string]bool{}
-		for _, sn := range Sessions.Snapshot() {
-			if seen[sn.Email] {
-				continue
-			}
-			seen[sn.Email] = true
-			s.mu.RLock()
-			acc := s.st.Accounts[ekey(sn.Email)]
-			dead := acc == nil || !acc.Enable || acc.expired(now) || acc.overQuota()
-			s.mu.RUnlock()
-			if dead {
-				Sessions.KickEmail(sn.Email)
-			}
+		s.enforceOnce()
+	}
+}
+
+// enforceOnce kicks the sessions of accounts that are disabled, expired, depleted or gone.
+// Nothing else ever disconnects a user from here.
+func (s *Store) enforceOnce() {
+	now := nowMs()
+	seen := map[string]bool{}
+	for _, sn := range Sessions.Snapshot() {
+		if seen[sn.Email] {
+			continue
+		}
+		seen[sn.Email] = true
+		s.mu.RLock()
+		acc := s.st.Accounts[ekey(sn.Email)]
+		dead := acc == nil || !acc.Enable || acc.expired(now) || acc.overQuota()
+		s.mu.RUnlock()
+		if dead {
+			Sessions.KickEmail(sn.Email)
 		}
 	}
 }

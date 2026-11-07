@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -335,52 +336,148 @@ func TestBotAPIContract(t *testing.T) {
 func TestSingleProtocolAtATime(t *testing.T) {
 	st := testStore(t)
 	seed(st) // alice on openvpn (1) and l2tp (2)
-	st.st.Accounts["alice@x"].SingleProto = true
 	st.st.Accounts["alice@x"].LimitIP = 2
 	pass := func(stored string) bool { return stored == "secret" }
-	old := func(id string, proto string, ageSec int64) {
-		Sessions.Add(&Session{ID: id, Email: "alice@x", Proto: proto, Start: nowMs() - ageSec*1000, LastSeen: nowMs()})
+	reset := func() {
+		Sessions.mu.Lock()
+		Sessions.byID = map[string]*Session{}
+		Sessions.mu.Unlock()
 	}
-	// two OpenVPN sessions (udp + tcp are one protocol) are fine under limit 2 ...
-	old("a", "openvpn-udp", 600)
-	old("b", "openvpn-tcp", 600)
-	if r := st.AuthorizeFn(1, "alice", pass, nil); r.Reason != "" && !strings.Contains(r.Reason, "limit") {
-		t.Fatalf("unexpected %q", r.Reason)
+	reset()
+	killed := make(chan string, 8)
+	live := func(id, proto string, ageSec int64) {
+		Sessions.Add(&Session{ID: id, Email: "alice@x", Proto: proto, Start: nowMs() - ageSec*1000, LastSeen: nowMs(),
+			Kill: func() { killed <- id }})
 	}
-	// ... but an L2TP login must push the OpenVPN sessions out, not coexist with them
+	// default: no mixing. udp + tcp are one protocol, so two OpenVPN sessions fit under limit 2 ...
+	live("a", "openvpn-udp", 600)
+	if r := st.AuthorizeFn(1, "alice", pass, &Session{ID: "n1", Proto: "openvpn-tcp"}); !r.OK {
+		t.Fatalf("second OpenVPN transport refused: %q", r.Reason)
+	}
+	// ... but an L2TP login is refused outright, however old the OpenVPN sessions are, and
+	// the running connections are not touched
+	if r := st.AuthorizeFn(2, "alice", pass, nil); r.OK || !strings.Contains(r.Reason, "another protocol") {
+		t.Fatalf("other protocol must be refused: %+v", r)
+	}
+	select {
+	case id := <-killed:
+		t.Fatalf("session %s was disconnected by a refused login", id)
+	case <-time.After(300 * time.Millisecond):
+	}
+	// once the OpenVPN sessions are gone the other protocol is welcome
+	reset()
+	if r := st.AuthorizeFn(2, "alice", pass, nil); !r.OK {
+		t.Fatalf("l2tp after disconnect refused: %q", r.Reason)
+	}
+	// the admin can allow mixing
+	reset()
+	live("c", "l2tp", 600)
+	st.st.Global.AllowMultiProto = true
+	if r := st.AuthorizeFn(1, "alice", pass, nil); !r.OK {
+		t.Fatalf("mixed protocols allowed by the admin should pass: %q", r.Reason)
+	}
+	// ... unless that one account is pinned to a single protocol
+	st.st.Accounts["alice@x"].SingleProto = true
+	if r := st.AuthorizeFn(1, "alice", pass, nil); r.OK {
+		t.Fatal("a pinned account must not mix")
+	}
+}
+
+// Many accounts logging in at the same time on all three protocols: every account ends up on
+// exactly one protocol and never above its device limit.
+func TestManyUsersConcurrent(t *testing.T) {
+	st := testStore(t)
+	st.st.Inbounds[1] = &Inbound{ID: 1, Enable: true, Port: 1001, Protocol: "openvpn", Settings: map[string]any{}}
+	st.st.Inbounds[2] = &Inbound{ID: 2, Enable: true, Port: 1701, Protocol: "l2tp", Settings: map[string]any{}}
+	st.st.Inbounds[3] = &Inbound{ID: 3, Enable: true, Port: 1002, Protocol: "openconnect", Settings: map[string]any{}}
+	st.st.Global.LimitStrategy = "reject"
+	const N = 300
+	for i := 0; i < N; i++ {
+		e := fmt.Sprintf("u%d@x", i)
+		st.st.Accounts[e] = &Account{Email: e, Username: fmt.Sprintf("u%d", i), Password: "pw", Enable: true, LimitIP: 1, Inbounds: []int{1, 2, 3}}
+	}
 	Sessions.mu.Lock()
 	Sessions.byID = map[string]*Session{}
 	Sessions.mu.Unlock()
-	old("a", "openvpn-udp", 600)
-	old("b", "openvpn-tcp", 600)
-	killed := make(chan string, 4)
-	for _, id := range []string{"a", "b"} {
-		id := id
-		Sessions.byID[id].Kill = func() { killed <- id }
-	}
-	r := st.AuthorizeFn(2, "alice", pass, nil)
-	if !r.OK {
-		t.Fatalf("l2tp login refused: %q", r.Reason)
-	}
-	for i := 0; i < 2; i++ {
-		select {
-		case <-killed:
-		case <-time.After(2 * time.Second):
-			t.Fatalf("expected both openvpn sessions evicted, got %d", i)
+	pass := func(stored string) bool { return stored == "pw" }
+	var wg sync.WaitGroup
+	var okCount [N]int32
+	for i := 0; i < N; i++ {
+		for in := 1; in <= 3; in++ {
+			for dev := 0; dev < 2; dev++ { // two devices per protocol
+				wg.Add(1)
+				go func(i, in, dev int) {
+					defer wg.Done()
+					sid := fmt.Sprintf("s-%d-%d-%d", i, in, dev)
+					r := st.AuthorizeFn(in, fmt.Sprintf("u%d", i), pass, &Session{ID: sid, Proto: map[int]string{1: "openvpn-udp", 2: "l2tp", 3: "openconnect"}[in]})
+					if r.OK {
+						atomic.AddInt32(&okCount[i], 1)
+					}
+				}(i, in, dev)
+			}
 		}
 	}
-	// a fresh other-protocol session inside the grace window blocks the new protocol
+	wg.Wait()
+	for i := 0; i < N; i++ {
+		if okCount[i] != 1 {
+			t.Fatalf("account u%d got %d simultaneous sessions, want exactly 1", i, okCount[i])
+		}
+	}
+}
+
+// Adding, editing and removing other accounts must never disconnect anybody who is connected.
+func TestAccountChangesNeverDisconnect(t *testing.T) {
+	st := testStore(t)
+	seed(st)
 	Sessions.mu.Lock()
 	Sessions.byID = map[string]*Session{}
 	Sessions.mu.Unlock()
-	old("c", "l2tp", 5)
-	if r := st.AuthorizeFn(1, "alice", pass, nil); r.OK || !strings.Contains(r.Reason, "another protocol") {
-		t.Fatalf("young session on another protocol must block: %+v", r)
+	var kicks int32
+	for i := 0; i < 100; i++ {
+		e := fmt.Sprintf("c%d@x", i)
+		st.st.Accounts[e] = &Account{Email: e, Username: fmt.Sprintf("c%d", i), Password: "pw", Enable: true, Inbounds: []int{1},
+			ExpiryTime: nowMs() + 86400000, TotalGB: 1 << 40}
+		Sessions.Add(&Session{ID: "k" + e, Email: e, Proto: "openvpn-udp", InboundID: 1, Start: nowMs(), LastSeen: nowMs(),
+			Kill: func() { atomic.AddInt32(&kicks, 1) }})
 	}
-	// without the flag, protocols mix freely up to the device limit
-	st.st.Accounts["alice@x"].SingleProto = false
-	if r := st.AuthorizeFn(1, "alice", pass, nil); !r.OK {
-		t.Fatalf("mixed protocols under the limit should pass: %q", r.Reason)
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() { // the admin / the bot keeps creating, editing and deleting OTHER accounts
+		defer wg.Done()
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			e := fmt.Sprintf("x%d@x", i)
+			st.mu.Lock()
+			st.st.Accounts[e] = &Account{Email: e, Username: fmt.Sprintf("x%d", i), Password: "pw", Enable: true, Inbounds: []int{1}}
+			st.st.Accounts[e].TotalGB = 5
+			delete(st.st.Accounts, e)
+			st.touch()
+			st.mu.Unlock()
+		}
+	}()
+	for i := 0; i < 200; i++ {
+		st.enforceOnce()
+		st.AddTraffic("c1@x", 10, 10)
+	}
+	close(stop)
+	wg.Wait()
+	time.Sleep(100 * time.Millisecond)
+	if n := atomic.LoadInt32(&kicks); n != 0 {
+		t.Fatalf("%d healthy sessions were disconnected", n)
+	}
+	// and the ones that really must go are still kicked
+	st.mu.Lock()
+	st.st.Accounts["c2@x"].Enable = false
+	st.mu.Unlock()
+	st.enforceOnce()
+	time.Sleep(100 * time.Millisecond)
+	if n := atomic.LoadInt32(&kicks); n != 1 {
+		t.Fatalf("disabled account: %d kicks, want 1", n)
 	}
 }
 
