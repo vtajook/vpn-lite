@@ -207,7 +207,7 @@ function accountModal(a){const isNew=!a;a=a||{email:"",username:"",password:rand
    const client={id:a.username||a.email||f.email.value.trim(),email:isNew?f.email.value.trim():a.email,enable:f.en.checked,limitIp:+f.limit.value||0,totalGB:Math.round((+f.gb.value||0)*1073741824),
     expiryTime:expiry,tgId:0,subId:a.subId||"",comment:f.comment.value,reset:+f.reset.value||0,password:f.pass.value.trim(),speedLimitDown:+f.dn.value||0,speedLimitUp:+f.up.value||0,singleProto:f.single.checked};
    if(isNew)client.id=client.email;
-   const p=new URLSearchParams();p.set("id",ids[0]);p.set("settings",JSON.stringify({clients:[client]}));ids.forEach(i=>p.append("inboundIds",i));
+   const p=new URLSearchParams();p.set("id",isNew?ids[0]:(a.inbounds&&a.inbounds[0])||ids[0]);p.set("settings",JSON.stringify({clients:[client]}));ids.forEach(i=>p.append("inboundIds",i));
    const r=await fetch(BASE+"panel/api/inbounds/"+(isNew?"addClient":"updateClient/"+encodeURIComponent(a.password)),{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:p.toString()});
    const j=await r.json();if(!j.success){toast(j.msg,1);return}toast(t("saved"));m.remove();render()}},t("save"))]);}
 const bulkOne=(a,e)=>post("panel/ui/bulk",{action:a,emails:[e]});

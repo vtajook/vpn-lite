@@ -424,6 +424,10 @@ func (a *API) updateClient(w http.ResponseWriter, r *http.Request) {
 	ident := r.PathValue("clientId")
 	a.st.mu.Lock()
 	acc := a.st.accountByIdentityLocked(target, ident)
+	if _, present := r.Form["inboundIds"]; acc == nil && present {
+		// the panel UI lists a newly ticked inbound first; the account is not a member yet
+		acc = a.st.accountByIdentityLocked(0, ident)
+	}
 	if acc == nil {
 		a.st.mu.Unlock()
 		fail(w, "Client not found")

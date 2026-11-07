@@ -284,6 +284,10 @@ func TestBotAPIContract(t *testing.T) {
 	if r["success"] != true {
 		t.Fatalf("add l2tp: %v", r)
 	}
+	if r = post("/panel/api/inbounds/add", url.Values{"remark": {"cisco"}, "enable": {"true"}, "port": {"1002"},
+		"protocol": {"openconnect"}, "settings": {`{"clients":[]}`}}); r["success"] != true {
+		t.Fatalf("add cisco: %v", r)
+	}
 	// addClient exactly the way vpnui.php sends it, on two inbounds
 	body := url.Values{"id": {"1"}, "settings": {`{"clients":[{"email":"bob1","enable":true,"limitIp":0,"totalGB":1073741824,"expiryTime":0,"tgId":0,"subId":"abc","comment":"","reset":0,"id":"bob1","password":"pw123"}]}`},
 		"inboundIds": {"1", "2"}}
@@ -312,6 +316,12 @@ func TestBotAPIContract(t *testing.T) {
 	if tr["obj"].(map[string]any)["expiryTime"].(float64) != 1999999999000 {
 		t.Fatal("update not applied")
 	}
+	// UI case: a newly ticked inbound (not yet a member) is sent as the target id
+	upd2 := url.Values{"id": {"3"}, "settings": {`{"clients":[{"email":"bob1","enable":true,"limitIp":0,"totalGB":2147483648,"expiryTime":1999999999000,"tgId":0,"subId":"abc","comment":"","reset":0,"id":"bob1","password":"pw123"}]}`},
+		"inboundIds": {"3", "1", "2"}}
+	if r := post("/panel/api/inbounds/updateClient/pw123", upd2); r["success"] != true {
+		t.Fatalf("updateClient with non-member target id: %v", r)
+	}
 	if r := post("/panel/api/inbounds/1/resetClientTraffic/bob1", nil); r["success"] != true {
 		t.Fatal("reset")
 	}
@@ -319,6 +329,9 @@ func TestBotAPIContract(t *testing.T) {
 		t.Fatal("delByEmail")
 	}
 	// still a member of inbound 2, so the account lives on; deleting there removes it
+	if r := post("/panel/api/inbounds/3/delClient/pw123", nil); r["success"] != true {
+		t.Fatalf("delClient 3: %v", r)
+	}
 	if r := post("/panel/api/inbounds/2/delClient/pw123", nil); r["success"] != true {
 		t.Fatalf("delClient: %v", r)
 	}
