@@ -119,3 +119,12 @@ func mschapv2Verify(user, password string, authChal, peerChal, ntResp []byte) (s
 	e.Write([]byte("Pad to make it do more than one iteration"))
 	return "S=" + strings.ToUpper(hex.EncodeToString(e.Sum(nil))), true
 }
+
+// mschapv1Verify checks an MS-CHAP (v1) NT-Response: DES of the NT hash over the 8-byte challenge.
+// Old Android versions, some modems and routers still offer only this method.
+func mschapv1Verify(password string, chal, ntResp []byte) bool {
+	if len(chal) != 8 || len(ntResp) != 24 {
+		return false
+	}
+	return string(challengeResponse(chal, ntHash(password))) == string(ntResp)
+}

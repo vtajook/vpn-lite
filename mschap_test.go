@@ -34,3 +34,15 @@ func TestMD4(t *testing.T) {
 		}
 	}
 }
+
+func TestMSCHAPv1(t *testing.T) {
+	// RFC 2759 section 9.2 intermediate values: challenge D02E4386BCE91226, password "clientPass"
+	chal := h("D02E4386BCE91226")
+	nt := h("82309ECD8D708B5EA08FAA3981CD83544233114A3D85D6DF")
+	if !mschapv1Verify("clientPass", chal, nt) {
+		t.Fatal("NT-Response did not verify")
+	}
+	if mschapv1Verify("wrong", chal, nt) || mschapv1Verify("clientPass", chal[:4], nt) {
+		t.Fatal("bad input verified")
+	}
+}

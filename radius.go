@@ -318,8 +318,27 @@ func (r *RadiusServer) handleAuth(from *net.UDPAddr, p *radPkt) []byte {
 			}
 			return ok
 		}
+	case p.msAttr(1) != nil:
+		resp := p.msAttr(1) // ident(1) flags(1) LM-Response(24) NT-Response(24)
+		chal := p.msAttr(11)
+		if len(resp) != 50 || len(chal) != 8 {
+			return reject("malformed MS-CHAP", -1)
+		}
+		if resp[1]&1 == 0 { // LM-only responses are not supported
+			return reject("MS-CHAP without NT response is not supported", int(resp[0]))
+		}
+		msIdent = int(resp[0])
+		verify = func(stored string) bool { return mschapv1Verify(stored, chal, resp[26:50]) }
 	default:
-		return reject("no supported credential", -1)
+		var kinds []string
+		for _, a := range p.Attrs {
+			if a.T == attrVendorSpecific && len(a.V) >= 5 && binary.BigEndian.Uint32(a.V[:4]) == vendorMS {
+				kinds = append(kinds, "ms"+strconv.Itoa(int(a.V[4])))
+			} else {
+				kinds = append(kinds, strconv.Itoa(int(a.T)))
+			}
+		}
+		return reject("no supported credential (attributes: "+strings.Join(kinds, ",")+")", -1)
 	}
 	if acc == nil {
 		verify = func(string) bool { return false }
