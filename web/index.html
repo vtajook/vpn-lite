@@ -102,7 +102,11 @@ function fmtExp(ms){if(!ms)return t("unl");const d=(ms-Date.now())/864e5;return 
 function ago(ms){if(!ms)return t("never");const s=(Date.now()-ms)/1000;return s<90?Math.round(s)+"s":s<5400?Math.round(s/60)+"m":s<172800?Math.round(s/3600)+"h":Math.round(s/86400)+"d"}
 function fmtDate(ms){return new Date(ms).toLocaleString()}
 
-let page="dash",timer=null,inboundsCache=[];
+let page="dash",timer=null,inboundsCache=[],booted=false;
+const hashPage=()=>{const k=decodeURIComponent(location.hash.replace(/^#\/?/,"")).split("?")[0];return ["dash","accounts","inbounds","online","logs","settings"].includes(k)?k:"dash"};
+page=hashPage();
+function go(k){if(hashPage()===k&&location.hash){page=k;render()}else location.hash="#/"+k}
+addEventListener("hashchange",()=>{const k=hashPage();if(booted&&k!==page){page=k;render()}});
 function showLogin(){clearInterval(timer);const u=h("input",{placeholder:t("user"),autocomplete:"username"}),p=h("input",{type:"password",placeholder:t("pass"),autocomplete:"current-password"});
  const go=async()=>{const r=await fetch(BASE+"login",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({username:u.value,password:p.value})});
   const j=await r.json();if(j.success)boot();else toast(j.msg,1)};
@@ -111,12 +115,12 @@ function showLogin(){clearInterval(timer);const u=h("input",{placeholder:t("user
 
 const PAGES=["dash","accounts","inbounds","online","logs","settings"];const ICON={dash:"📊",accounts:"👥",inbounds:"🔌",online:"🟢",logs:"📜",settings:"⚙️"};
 function shell(content){
- const nav=PAGES.map(k=>h("a",{class:k===page?"on":"",onclick:()=>{page=k;render()}},h("b",{},ICON[k]),t(k)));
+ const nav=PAGES.map(k=>h("a",{class:k===page?"on":"",onclick:()=>go(k)},h("b",{},ICON[k]),t(k)));
  return h("div",{class:"app"},h("div",{class:"side"},h("h1",{},h("i",{},"🛡️"),"VPN Lite"),nav,h("hr"),
   h("a",{onclick:()=>{lang=lang==="fa"?"en":"fa";localStorage.setItem("lang",lang);applyLook();render()}},t("lang")),
   h("a",{onclick:()=>{theme=theme==="dark"?"light":"dark";localStorage.setItem("theme",theme);applyLook()}},t("theme")),
   h("a",{onclick:async()=>{await fetch(BASE+"logout");showLogin()}},t("logout"))),
-  h("div",{class:"main"},h("div",{class:"mob"},PAGES.map(k=>h("a",{class:k===page?"on":"",onclick:()=>{page=k;render()}},t(k)))),content))}
+  h("div",{class:"main"},h("div",{class:"mob"},PAGES.map(k=>h("a",{class:k===page?"on":"",onclick:()=>go(k)},t(k)))),content))}
 async function render(){document.body.classList.remove("lg");clearInterval(timer);const c=h("div");$root.replaceChildren(shell(c));
  const fn={dash:pDash,accounts:pAccounts,inbounds:pInbounds,online:pOnline,logs:pLogs,settings:pSettings}[page];
  try{await fn(c)}catch(e){if(e.message!=="auth")console.error(e)}}
@@ -132,7 +136,7 @@ async function doUpdate(){const j=await api("panel/ui/updateCheck");if(!j.succes
 async function pDash(c){
  const draw=async()=>{const s=await call("panel/ui/summary");const st=s.status||{};inboundsCache=s.inbounds;
   const sy=s.sys,pc=n=>Math.max(0,Math.min(100,n||0));
-  const jump=(pg,st)=>()=>{if(pg==="accounts"){AS.status=st||"";AS.q="";AS.inbound="";AS.page=1;AS.sel.clear()}page=pg;render()};
+  const jump=(pg,st)=>()=>{if(pg==="accounts"){AS.status=st||"";AS.q="";AS.inbound="";AS.page=1;AS.sel.clear()}go(pg)};
   const box=(ic,col,l,body,go)=>h("div",{class:"card dc"+(go?" lk":""),style:"--c:"+col,onclick:go||null},h("div",{class:"dh"},h("span",{class:"di"},ic),h("span",{class:"dl"},l)),body);
   const big=v=>h("div",{class:"dv num"},v);
   const meter=(p,left,right)=>h("div",{},h("div",{class:"dm"},h("span",{},left),h("b",{class:"num"},Math.round(p)+"%")),h("div",{class:"bar"+(p>90?" hi":"")},h("i",{style:"width:"+pc(p)+"%"})),right?h("div",{class:"mu num",style:"margin-top:4px;font-size:11px"},right):null);
@@ -384,7 +388,7 @@ async function pSettings(c){const s=await call("panel/ui/settings");const g=s.gl
    h("button",{class:"btn",onclick:async()=>{try{await saveAll();await post("panel/ui/backupNow");toast(t("tgsent"))}catch(e){toast(e.message,1)}}},"📤 "+t("tgnow"))),
   h("div",{class:"card"},h("button",{class:"btn d",onclick:async()=>{if(!confirm(t("confirm")))return;await post("panel/ui/restart");toast("…");setTimeout(()=>location.reload(),3500)}},t("restart"))))}
 
-async function boot(){try{await call("panel/ui/summary");render()}catch(e){if(e.message!=="auth")console.error(e)}}
+async function boot(){try{await call("panel/ui/summary");booted=true;if(!location.hash)history.replaceState(null,"","#/"+page);render()}catch(e){if(e.message!=="auth")console.error(e)}}
 boot();
 </script>
 </body>
