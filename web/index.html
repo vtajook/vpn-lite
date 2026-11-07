@@ -346,14 +346,6 @@ async function pSettings(c){const s=await call("panel/ui/settings");const g=s.gl
    field(t("tgtoken"),f.tt),field(t("tgchat"),f.tg),field(t("tghours"),f.th),field(t("tglogin"),f.tl),field(t("tgcpu"),f.tc2),
    h("button",{class:"btn p",onclick:saveAll},t("save"))," ",
    h("button",{class:"btn",onclick:async()=>{try{await saveAll();await post("panel/ui/backupNow");toast(t("tgsent"))}catch(e){toast(e.message,1)}}},"📤 "+t("tgnow"))),
-  h("div",{class:"card",style:"margin-bottom:12px"},h("h3",{style:"margin-top:0"},"🔁 "+t("imp")),
-   h("div",{class:"mu",style:"margin-bottom:10px"},t("imphelp")),
-   field(t("impurl"),im.u),field(t("user"),im.n),field(t("pass"),im.p),field(t("shift"),im.s),field(t("impen"),im.e),
-   h("button",{class:"btn p",onclick:async()=>{
-     if(!im.u.value||!im.n.value||!im.p.value){toast(t("impreq"),1);return}
-     toast("…");
-     try{const j=await api("panel/ui/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:im.u.value.trim(),user:im.n.value.trim(),pass:im.p.value,portShift:+im.s.value||0,enable:im.e.checked})});toast(j.msg||"error",!j.success);if(j.success)im.p.value=""}catch(e){toast(e.message,1)}
-   }},t("impgo"))),
   h("div",{class:"card"},h("button",{class:"btn d",onclick:async()=>{if(!confirm(t("confirm")))return;await post("panel/ui/restart");toast("…");setTimeout(()=>location.reload(),3500)}},t("restart"))))}
 
 async function boot(){try{await call("panel/ui/summary");render()}catch(e){if(e.message!=="auth")console.error(e)}}
