@@ -342,6 +342,10 @@ func (i *ovpnInst) account(sid string, up, down int64) {
 	}
 }
 
+// ovpnPerClient is the client-specific config sent with every accepted login (the
+// client-connect format; one option per line).
+const ovpnPerClient = "push-remove ping-restart\npush \"ping-restart 60\"\n"
+
 func (i *ovpnInst) dispatch(evt, cid, kid string, env map[string]string) {
 	switch evt {
 	case "CONNECT", "REAUTH":
@@ -359,7 +363,17 @@ func (i *ovpnInst) dispatch(evt, cid, kid string, env map[string]string) {
 			ok, reason = res.OK, res.Reason
 		}
 		if ok {
-			i.send("client-auth-nt %s %s", cid, kid)
+			if evt == "CONNECT" {
+				// per-client config, applied without restarting the daemon: the server config
+				// pushes ping-restart 20, so a 20 s network stall (common behind the relay)
+				// made every client reconnect, and the reconnect hit "device limit reached"
+				// while the server (40 s) still held the old connection. Clients now wait 60 s:
+				// short stalls pass unnoticed, and after a long one the server has already
+				// freed the slot when the client comes back.
+				i.send("client-auth %s %s\n%sEND", cid, kid, ovpnPerClient)
+			} else {
+				i.send("client-auth-nt %s %s", cid, kid)
+			}
 			return
 		}
 		Events.Add("reject", "openvpn", user, "%s src=%s", reason, env["untrusted_ip"])

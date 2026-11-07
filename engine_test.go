@@ -87,8 +87,13 @@ func TestOvpnManagementAuth(t *testing.T) {
 		t.Fatalf("bad password: %q", got)
 	}
 	connect("0", "alice", "secret")
-	if got := read(); got != "client-auth-nt 0 1" {
+	if got := read(); got != "client-auth 0 1" {
 		t.Fatalf("good password: %q", got)
+	}
+	for _, want := range []string{"push-remove ping-restart", `push "ping-restart 60"`, "END"} {
+		if got := read(); got != want {
+			t.Fatalf("client config line %q, want %q", got, want)
+		}
 	}
 	// second device while the first is younger than the grace window: refused, no eviction
 	connect("1", "alice", "secret")
@@ -100,9 +105,14 @@ func TestOvpnManagementAuth(t *testing.T) {
 	Sessions.byID["ovpn-1-udp-0"].Start -= 120_000
 	Sessions.mu.Unlock()
 	connect("2", "alice", "secret")
-	a, b := read(), read()
-	if !(a == "client-kill 0" && b == "client-auth-nt 2 1") && !(b == "client-kill 0" && a == "client-auth-nt 2 1") {
-		t.Fatalf("eviction: %q %q", a, b)
+	// the kill is sent asynchronously: before or after the (atomic) auth block
+	var got []string
+	for i := 0; i < 5; i++ {
+		got = append(got, read())
+	}
+	block := `client-auth 2 1|push-remove ping-restart|push "ping-restart 60"|END`
+	if j := strings.Join(got, "|"); j != "client-kill 0|"+block && j != block+"|client-kill 0" {
+		t.Fatalf("eviction: %q", got)
 	}
 	// accounting through BYTECOUNT and DISCONNECT
 	go srv.Write([]byte(">BYTECOUNT_CLI:2,1000,5000\r\n"))
