@@ -314,6 +314,7 @@ func (s *Store) addInboundBytes(inbound int, up, down int64) {
 	}
 	s.st.Global.TotalUp += up
 	s.st.Global.TotalDown += down
+	s.st.Global.TotalUsed += up + down
 	s.touch()
 	s.mu.Unlock()
 }

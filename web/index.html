@@ -129,7 +129,7 @@ async function pDash(c){
   const COL=["#6366f1","#10b981","#06b6d4","#f59e0b","#ef4444","#8b5cf6","#ec4899","#0ea5e9"],EM=["🟢","🔗","👥","✅","⛔","📦","🖥️","🧠","🌐","⚖️"];let si=0;const stat=(v,l)=>{const k=si++;return h("div",{class:"card stat",style:"--c:"+COL[k%COL.length]},h("em",{},EM[k%EM.length]),h("b",{class:"num"},v),h("span",{},l))};
   c.replaceChildren(h("div",{class:"top"},h("h2",{},t("dash"))),
    h("div",{class:"grid"},stat(s.onlineUsers,t("onlineu")),stat(s.sessions,t("sessions")),stat(s.accounts,t("accounts")),stat(st.active||0,t("active")),
-    stat((st.expired||0)+(st.depleted||0),t("expired")+" / "+t("depleted")),stat(fmtB(s.usedBytes),t("used"))),
+    stat((st.expired||0)+(st.depleted||0),t("expired")+" / "+t("depleted")),stat(fmtB(s.usedBytes),t("used")),stat("↓ "+fmtB(s.totalDown||0)+"  ↑ "+fmtB(s.totalUp||0),t("rxtx"))),
    h("div",{class:"grid"},stat(s.sys.cpu.toFixed(0)+"%",t("cpu")),stat(s.sys.mem.toFixed(0)+"%",t("mem")),
     stat("↓ "+fmtB(s.sys.rxBps)+"/s",t("net")+" ↑ "+fmtB(s.sys.txBps)+"/s"),stat(s.sys.load||"-","load")),
    h("div",{class:"grid"},stat(fmtUp(s.sys.uptime),t("uptime")),stat(s.sys.version||"-",t("ver"))),

@@ -816,6 +816,9 @@ func (a *API) uiBackupNow(w http.ResponseWriter, r *http.Request) {
 func (a *API) uiResetTotal(w http.ResponseWriter, r *http.Request) {
 	a.st.mu.Lock()
 	a.st.st.Global.TotalUsed, a.st.st.Global.TotalUp, a.st.st.Global.TotalDown = 0, 0, 0
+	for _, in := range a.st.st.Inbounds { // the services start counting from zero too
+		in.Up, in.Down = 0, 0
+	}
 	a.st.st.Global.TotalInit = true
 	a.st.touch()
 	a.st.mu.Unlock()

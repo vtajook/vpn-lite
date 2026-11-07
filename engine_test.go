@@ -736,7 +736,7 @@ func TestVpnUiDBBackup(t *testing.T) {
 func TestLifetimeUsageNeverDrops(t *testing.T) {
 	st := testStore(t)
 	seed(st)
-	st.AddTraffic("alice@x", 1000, 2000)
+	st.addInboundBytes(1, 1000, 2000)
 	if st.st.Global.TotalUsed != 3000 {
 		t.Fatalf("total %d", st.st.Global.TotalUsed)
 	}
@@ -764,7 +764,10 @@ func TestLifetimeUsageNeverDrops(t *testing.T) {
 func TestResetTotalAndDeleteExpired(t *testing.T) {
 	st := testStore(t)
 	seed(st)
-	st.AddTraffic("alice@x", 100, 100)
+	st.addInboundBytes(1, 100, 100)
+	if st.st.Global.TotalUsed != st.st.Global.TotalUp+st.st.Global.TotalDown {
+		t.Fatal("total usage must equal received + sent")
+	}
 	st.mu.Lock()
 	st.st.Accounts["alice@x"].ExpiryTime = nowMs() - 1000
 	st.mu.Unlock()
@@ -784,8 +787,13 @@ func TestResetTotalAndDeleteExpired(t *testing.T) {
 	}
 	a.uiResetTotal(httptest.NewRecorder(), httptest.NewRequest("POST", "/", nil))
 	st.mu.Lock()
-	if st.st.Global.TotalUsed != 0 || !st.st.Global.TotalInit {
+	if st.st.Global.TotalUsed != 0 || st.st.Global.TotalUp != 0 || !st.st.Global.TotalInit {
 		t.Fatalf("reset: %d", st.st.Global.TotalUsed)
+	}
+	for id, in := range st.st.Inbounds {
+		if in.Up != 0 || in.Down != 0 {
+			t.Fatalf("service %d kept its counters after the reset: %d/%d", id, in.Up, in.Down)
+		}
 	}
 	st.mu.Unlock()
 }
