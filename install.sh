@@ -84,11 +84,17 @@ install_deps() { # install_deps force(0|1)
     case "$need" in *ocserv*) systemctl disable --now ocserv.socket ocserv.service >/dev/null 2>&1 || true;; esac
     case "$need" in *xl2tpd*) systemctl disable --now xl2tpd.service >/dev/null 2>&1 || true;; esac
   fi
-  modprobe -a tun ppp_generic ppp_async l2tp_ppp pppol2tp 2>/dev/null || true
-  if [ ! -e /dev/ppp ] && command -v apt-get >/dev/null; then
-    apt-get install -y -qq "linux-modules-extra-$(uname -r)" >/dev/null 2>&1 || true
-    modprobe -a ppp_generic ppp_async l2tp_ppp pppol2tp 2>/dev/null || true
+  modprobe -a tun ppp_generic ppp_async 2>/dev/null || true
+  # The kernel L2TP module is in linux-modules-extra on Ubuntu; without it xl2tpd falls back to a
+  # slower user-space path. Install it when modprobe cannot find it.
+  if ! modprobe l2tp_ppp 2>/dev/null && command -v apt-get >/dev/null; then
+    say "installing the kernel L2TP module (linux-modules-extra-$(uname -r))"
+    apt-get install -y -qq "linux-modules-extra-$(uname -r)" >/dev/null 2>&1 || warn "could not install linux-modules-extra-$(uname -r); L2TP will work but slower"
+    modprobe l2tp_ppp 2>/dev/null || true
   fi
+  modprobe pppol2tp 2>/dev/null || true
+  # load them again after a reboot
+  printf 'tun\nppp_generic\nppp_async\nl2tp_ppp\npppol2tp\n' > /etc/modules-load.d/vpn-lite.conf 2>/dev/null || true
   [ -e /dev/ppp ] || warn "/dev/ppp is missing: L2TP will not work on this kernel (OpenVPN and Cisco are unaffected)."
   if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
     warn "ufw is active: open the VPN ports and run: ufw default allow routed"
@@ -115,13 +121,13 @@ fetch_binary() {
 
 host_tuning() {
   modprobe nf_conntrack 2>/dev/null || true
-  cat > /etc/sysctl.d/99-vpn-lite.conf <<'SYS'
+  cat > /etc/sysctl.d/99-vpn-lite.conf /etc/modules-load.d/vpn-lite.conf <<'SYS'
 net.ipv4.ip_forward = 1
 net.netfilter.nf_conntrack_max = 1048576
 net.core.rmem_max = 4194304
 net.core.wmem_max = 4194304
 SYS
-  sysctl -q -p /etc/sysctl.d/99-vpn-lite.conf 2>/dev/null || true
+  sysctl -q -p /etc/sysctl.d/99-vpn-lite.conf /etc/modules-load.d/vpn-lite.conf 2>/dev/null || true
 }
 
 write_unit() {
@@ -236,7 +242,7 @@ do_install() { # full wizard; on an existing install it is a clean rewrite that 
     say "clean reinstall (accounts and services are kept)"
     wipe_runtime
     cp -f "$STATE" "$STATE.pre-reinstall" 2>/dev/null || true
-    rm -rf /etc/vpn-lite /run/vpn-lite /etc/swanctl/conf.d/vpn-lite.conf /etc/systemd/system/vpn-lite.service /etc/sysctl.d/99-vpn-lite.conf
+    rm -rf /etc/vpn-lite /run/vpn-lite /etc/swanctl/conf.d/vpn-lite.conf /etc/systemd/system/vpn-lite.service /etc/sysctl.d/99-vpn-lite.conf /etc/modules-load.d/vpn-lite.conf
   fi
   [ "$DEPS" = 1 ] && install_deps "$clean"
   fetch_binary
@@ -365,7 +371,7 @@ do_uninstall() { # do_uninstall purge(0|1)
   say "stopping panel and its VPN daemons"
   systemctl disable --now vpn-lite 2>/dev/null || true
   wipe_runtime
-  rm -f /etc/systemd/system/vpn-lite.service "$BIN" /etc/swanctl/conf.d/vpn-lite.conf /etc/sysctl.d/99-vpn-lite.conf
+  rm -f /etc/systemd/system/vpn-lite.service "$BIN" /etc/swanctl/conf.d/vpn-lite.conf /etc/sysctl.d/99-vpn-lite.conf /etc/modules-load.d/vpn-lite.conf
   systemctl daemon-reload
   if [ "$1" = 1 ]; then
     rm -rf "$DATA" /etc/vpn-lite /var/log/vpn-lite /run/vpn-lite "$MENU_BIN"
