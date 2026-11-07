@@ -53,7 +53,7 @@ const T = {
  en:{dash:"Dashboard",accounts:"Accounts",inbounds:"Inbounds",online:"Online",logs:"Logs",settings:"Settings",login:"Sign in",user:"Username",pass:"Password",
   add:"Add account",bulkc:"Bulk create",search:"Search…",all:"All",active:"Active",expired:"Expired",depleted:"Depleted",disabled:"Disabled",save:"Save",cancel:"Cancel",
   del:"Delete",edit:"Edit",reset:"Reset traffic",kick:"Kick",enable:"Enable",disable:"Disable",extend:"Extend",used:"Total usage (lifetime)",expiry:"Expiry",devices:"Devices",speed:"Speed",
-  status:"Status",email:"Name / email",total:"Quota (GB, 0=∞)",days:"Days (0=∞)",hours:"Extra hours (e.g. 2 for a 2-hour test)",limit:"Simultaneous connections, all protocols together (0 = panel default)",down:"Download KB/s (0=∞)",up:"Upload KB/s (0=∞)",
+  rx:"Received (total)",tx:"Sent (total)",killall:"Kill all",ips:"IP",nsess:"Count",  status:"Status",email:"Name / email",total:"Quota (GB, 0=∞)",days:"Days (0=∞)",hours:"Extra hours (e.g. 2 for a 2-hour test)",limit:"Simultaneous connections, all protocols together (0 = panel default)",down:"Download KB/s (0=∞)",up:"Upload KB/s (0=∞)",
   comment:"Comment",resetd:"Auto reset (days)",protocols:"Services",sel:"selected",confirm:"Are you sure?",saved:"Saved",never:"never",left:"left",unl:"∞",
   page:"Page",of:"of",sessions:"Sessions",onlineu:"Online users",cpu:"CPU",mem:"Memory",net:"Network",members:"accounts",port:"Port",remark:"Name",proto:"Protocol",
   gen:"Generate certificates",rxtx:"Received / sent (all time)",totalused:"Total usage (all time)",totalin:"Services",users:"Users",ops:"Operations",resetaccts:"Reset usage of all accounts",resetsvc:"Reset the traffic counters of all services",addr:"Connection address",traffic:"Traffic",deflimit:"Default simultaneous connections per account",allowmulti:"Allow several protocols at the same time (off = while connected on one protocol, another is refused)",rsttotal:"Reset total usage",rstq:"Reset the server total usage counter to zero? Accounts keep their own usage.",delexp:"Delete expired",delexpq:"Delete {n} expired accounts permanently?",noexp:"No expired accounts",uptime:"Uptime",ver:"Version",update:"Update panel",reboot:"Reboot server",rebootq:"Reboot the whole server? All VPN connections drop for a minute.",rebooting:"Rebooting…",uptodate:"Already up to date",updq:"Update panel",updating:"Downloading update…",getssl:"Get SSL for connection domain (optional)",sslwait:"Requesting certificate from Let's Encrypt, up to a minute…",condomreq:"Enter the connection domain first",newin:"Add inbound",count:"How many",prefix:"Prefix",created:"Created",copy:"Copy",time:"Time",kind:"Kind",detail:"Detail",
@@ -65,7 +65,7 @@ const T = {
  fa:{dash:"داشبورد",accounts:"اکانت‌ها",inbounds:"سرویس‌ها",online:"آنلاین",logs:"لاگ",settings:"تنظیمات",login:"ورود",user:"نام کاربری",pass:"رمز",
   add:"افزودن اکانت",bulkc:"ساخت گروهی",search:"جستجو…",all:"همه",active:"فعال",expired:"منقضی",depleted:"تمام‌شده",disabled:"غیرفعال",save:"ذخیره",cancel:"انصراف",
   del:"حذف",edit:"ویرایش",reset:"ریست حجم",kick:"قطع",enable:"فعال",disable:"غیرفعال",extend:"تمدید",used:"مصرف کل (از ابتدا)",expiry:"انقضا",devices:"دستگاه",speed:"سرعت",
-  status:"وضعیت",email:"نام / ایمیل",total:"حجم (گیگ، ۰=نامحدود)",days:"روز (۰=نامحدود)",hours:"ساعت (مثلاً ۲ برای اکانت تست دو ساعته)",limit:"تعداد اتصال همزمان، مجموع همه‌ی پروتکل‌ها (۰ = پیش‌فرض پنل)",down:"دانلود KB/s (۰=نامحدود)",up:"آپلود KB/s (۰=نامحدود)",
+  rx:"دریافت کل",tx:"ارسال کل",killall:"قطع همه",ips:"آی‌پی",nsess:"تعداد",  status:"وضعیت",email:"نام / ایمیل",total:"حجم (گیگ، ۰=نامحدود)",days:"روز (۰=نامحدود)",hours:"ساعت (مثلاً ۲ برای اکانت تست دو ساعته)",limit:"تعداد اتصال همزمان، مجموع همه‌ی پروتکل‌ها (۰ = پیش‌فرض پنل)",down:"دانلود KB/s (۰=نامحدود)",up:"آپلود KB/s (۰=نامحدود)",
   comment:"توضیح",resetd:"ریست خودکار (روز)",protocols:"سرویس‌ها",sel:"انتخاب‌شده",confirm:"مطمئنی؟",saved:"ذخیره شد",never:"هرگز",left:"مانده",unl:"∞",
   page:"صفحه",of:"از",sessions:"اتصال‌ها",onlineu:"کاربر آنلاین",cpu:"پردازنده",mem:"حافظه",net:"شبکه",members:"اکانت",port:"پورت",remark:"نام",proto:"پروتکل",
   gen:"ساخت گواهی",rxtx:"دریافت / ارسال کل (از ابتدا)",totalused:"مصرف کل (از ابتدا)",totalin:"سرویس‌ها",users:"کاربران",ops:"عملیات کلی",resetaccts:"ریست مصرف همه‌ی اکانت‌ها",resetsvc:"ریست شمارنده‌ی ترافیک همه‌ی سرویس‌ها",addr:"نشانی اتصال",traffic:"ترافیک",deflimit:"پیش‌فرض تعداد اتصال همزمان هر اکانت",allowmulti:"اجازه‌ی اتصال همزمان با چند پروتکل (خاموش = تا وقتی با یک پروتکل وصله، پروتکل دیگر وصل نمی‌شود)",rsttotal:"ریست مصرف کل",rstq:"شمارنده‌ی مصرف کل سرور صفر شود؟ مصرف هر اکانت دست نمی‌خورد.",delexp:"حذف منقضی‌ها",delexpq:"{n} اکانت منقضی برای همیشه حذف شود؟",noexp:"اکانت منقضی‌ای نیست",uptime:"آپ‌تایم",ver:"نسخه",update:"آپدیت پنل",reboot:"ریبوت سرور",rebootq:"کل سرور ریبوت شود؟ اتصال‌ها حدود یک دقیقه قطع می‌شود.",rebooting:"در حال ریبوت…",uptodate:"آخرین نسخه نصب است",updq:"آپدیت پنل",updating:"در حال دانلود آپدیت…",getssl:"دریافت SSL برای دامنه اتصال (اختیاری)",sslwait:"در حال دریافت گواهی از Let's Encrypt، تا یک دقیقه…",condomreq:"اول دامنه اتصال را وارد کنید",newin:"سرویس جدید",count:"تعداد",prefix:"پیشوند",created:"ساخته شد",copy:"کپی",time:"زمان",kind:"نوع",detail:"جزئیات",
@@ -126,14 +126,15 @@ async function doUpdate(){const j=await api("panel/ui/updateCheck");if(!j.succes
  if(!r.success){toast(r.msg||"error",1);return}toast(r.msg);setTimeout(()=>location.reload(),5000)}
 async function pDash(c){
  const draw=async()=>{const s=await call("panel/ui/summary");const st=s.status||{};inboundsCache=s.inbounds;
-  const COL=["#6366f1","#10b981","#06b6d4","#f59e0b","#ef4444","#8b5cf6","#ec4899","#0ea5e9"],EM=["🟢","🔗","👥","✅","⛔","📦","🖥️","🧠","🌐","⚖️"];let si=0;const stat=(v,l)=>{const k=si++;return h("div",{class:"card stat",style:"--c:"+COL[k%COL.length]},h("em",{},EM[k%EM.length]),h("b",{class:"num"},v),h("span",{},l))};
+  const stat=(ic,col,v,l)=>h("div",{class:"card stat",style:"--c:"+col},h("em",{},ic),h("b",{class:"num"},v),h("span",{},l));
   c.replaceChildren(h("div",{class:"top"},h("h2",{},t("dash"))),
-   h("div",{class:"grid"},stat(s.onlineUsers,t("onlineu")),stat(s.sessions,t("sessions")),stat(s.accounts,t("accounts")),stat(st.active||0,t("active")),
-    stat((st.expired||0)+(st.depleted||0),t("expired")+" / "+t("depleted")),stat(fmtB(s.usedBytes),t("used")),stat("↓ "+fmtB(s.totalDown||0)+"  ↑ "+fmtB(s.totalUp||0),t("rxtx"))),
-   h("div",{class:"grid"},stat(s.sys.cpu.toFixed(0)+"%",t("cpu")),stat(s.sys.mem.toFixed(0)+"%",t("mem")),
-    stat("↓ "+fmtB(s.sys.rxBps)+"/s",t("net")+" ↑ "+fmtB(s.sys.txBps)+"/s"),stat(s.sys.load||"-","load")),
-   h("div",{class:"grid"},stat(fmtUp(s.sys.uptime),t("uptime")),stat(s.sys.version||"-",t("ver"))),
+   h("div",{class:"grid"},stat("🟢","#10b981",s.onlineUsers,t("onlineu")),stat("🔗","#06b6d4",s.sessions,t("sessions")),stat("👥","#6366f1",s.accounts,t("accounts")),
+    stat("✅","#f59e0b",st.active||0,t("active")),stat("⛔","#ef4444",(st.expired||0)+(st.depleted||0),t("expired")+" / "+t("depleted")),stat("📦","#8b5cf6",fmtB(s.usedBytes),t("used"))),
+   h("div",{class:"grid"},stat("⬇️","#0ea5e9",fmtB(s.totalDown||0),t("rx")),stat("⬆️","#ec4899",fmtB(s.totalUp||0),t("tx")),
+    stat("⚖️","#10b981","↓ "+fmtB(s.sys.rxBps)+"/s",t("net")+" ↑ "+fmtB(s.sys.txBps)+"/s"),stat("🧠","#06b6d4",s.sys.cpu.toFixed(0)+"%",t("cpu")),
+    stat("🌐","#6366f1",s.sys.mem.toFixed(0)+"%",t("mem")),stat("📈","#f59e0b",s.sys.load||"-","load")),
    h("div",{class:"card",style:"display:flex;gap:8px;flex-wrap:wrap;align-items:center"},
+    h("span",{class:"mu",style:"flex:1;min-width:150px"},t("uptime")+": "+fmtUp(s.sys.uptime)+"  ·  "+t("ver")+": "+(s.sys.version||"-")),
     h("button",{class:"btn p",onclick:doUpdate},"⬆ "+t("update")),
     h("button",{class:"btn",onclick:async()=>{if(!confirm(t("rstq")))return;await post("panel/ui/resetTotal");toast(t("saved"));draw()}},"↺ "+t("rsttotal")),
     h("button",{class:"btn d",onclick:async()=>{if(!confirm(t("rebootq")))return;await post("panel/ui/reboot");toast(t("rebooting"));setTimeout(()=>location.reload(),60000)}},"⟲ "+t("reboot"))),
@@ -309,10 +310,27 @@ function inboundModal(i){const isNew=!i;const raw=i?JSON.parse(i.settings):{};de
 
 /* ---------- online / logs ---------- */
 async function pOnline(c){
- const draw=async()=>{const r=(await call("panel/ui/sessions"))||[];
-  c.replaceChildren(h("div",{class:"top"},h("h2",{},t("online")+" ("+r.length+")")),h("div",{class:"card sc"},r.length?h("table",{},h("tr",{},["name","proto","IP","","↑ / ↓",t("time"),""].map(k=>h("th",{},k.length>2&&T.en[k]?t(k):k))),
-   r.map(s=>h("tr",{},h("td",{},s.Email),h("td",{},h("span",{class:"tag"},s.Proto)),h("td",{},s.SrcIP),h("td",{class:"mu"},s.VIP),h("td",{},h("span",{class:"num"},fmtB(s.Up)+" / "+fmtB(s.Down))),h("td",{},ago(s.Start)),
-    h("td",{},h("button",{class:"btn s d",onclick:async()=>{await post("panel/ui/kick?id="+encodeURIComponent(s.ID));setTimeout(draw,600)}},t("kick")))))):h("div",{class:"mu"},t("none"))))};
+ let q="",size=50,page=1,data=[];
+ const body=h("div");
+ const qi=h("input",{placeholder:t("search"),oninput:e=>{q=e.target.value;page=1;paint()}});
+ const sz=h("select",{onchange:e=>{size=+e.target.value;page=1;paint()}},[25,50,100,200].map(n=>h("option",{value:n,selected:n===size},n)));
+ const draw=async()=>{const r=(await call("panel/ui/sessions"))||[];const m=new Map();
+  r.forEach(s=>{if(!m.has(s.Email))m.set(s.Email,[]);m.get(s.Email).push(s)});
+  data=[...m.entries()].map(([email,list])=>({email,list})).sort((a,b)=>a.email.localeCompare(b.email));paint()};
+ const paint=()=>{const f=data.filter(x=>!q||x.email.toLowerCase().includes(q.toLowerCase()));
+  const pages=Math.max(1,Math.ceil(f.length/size));if(page>pages)page=pages;const rows=f.slice((page-1)*size,page*size);
+  const kill=async(x)=>{await post("panel/ui/kick?email="+encodeURIComponent(x.email));setTimeout(draw,600)};
+  const one=async(s)=>{await post("panel/ui/kick?id="+encodeURIComponent(s.ID));setTimeout(draw,600)};
+  const nav=(label,to,dis)=>h("button",{class:"btn s",disabled:dis,onclick:()=>{page=to;paint()}},label);
+  body.replaceChildren(h("div",{class:"card sc"},f.length?h("table",{},h("tr",{},["#",t("email"),t("nsess"),t("proto"),t("ips"),""].map(k=>h("th",{},k))),
+    rows.map((x,i)=>h("tr",{},h("td",{class:"mu"},(page-1)*size+i+1),h("td",{},h("b",{},x.email)),
+     h("td",{},h("span",{class:"tag",style:"background:#3b82f6;color:#fff"},x.list.length)),
+     h("td",{},[...new Set(x.list.map(s=>s.Proto))].map(p=>h("span",{class:"tag"},p))),
+     h("td",{},x.list.map(s=>h("div",{style:"display:flex;align-items:center;gap:6px;margin:2px 0"},h("span",{class:"num"},s.SrcIP||"-"),
+       h("button",{class:"btn s d",title:t("kick"),onclick:()=>one(s)},"✕")))),
+     h("td",{},h("button",{class:"btn s",style:"background:#f59e0b;color:#fff;border-color:#f59e0b",onclick:()=>kill(x)},"⛔ "+t("killall")))))):h("div",{class:"mu"},t("none"))),
+   h("div",{class:"pg"},h("span",{class:"mu"},f.length+" "+t("online")),nav("‹",page-1,page<=1),h("span",{},page+" / "+pages),nav("›",page+1,page>=pages)))};
+ c.replaceChildren(h("div",{class:"top"},h("h2",{},t("online"))),h("div",{class:"row"},qi,sz),body);
  await draw();auto(draw,5000)}
 async function pLogs(c){let email="",kind="";
  const em=h("input",{placeholder:t("email"),oninput:e=>{email=e.target.value;clearTimeout(em._t);em._t=setTimeout(draw,250)}});
