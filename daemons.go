@@ -29,6 +29,32 @@ type procDaemon struct {
 	// adoptUnknown: a daemon started before hashes were recorded is adopted as it is instead of restarted.
 	adoptUnknown bool
 	stop         chan struct{}
+	// reloadHash fingerprints the parts of the config the daemon re-reads on SIGHUP without
+	// dropping anyone (ocserv: timers such as dpd). A change of only these parts reloads the
+	// daemon instead of restarting it. Empty: the daemon has no such parts.
+	mu         sync.Mutex
+	reloadHash string
+}
+
+func (d *procDaemon) reloadPath() string { return d.pidFile + ".rhash" }
+
+// syncReload makes the running daemon (pid p) re-read its config when the reloadable parts
+// changed since it last read them. Nothing is disconnected by a reload.
+func (d *procDaemon) syncReload(p int) {
+	d.mu.Lock()
+	want := d.reloadHash
+	d.mu.Unlock()
+	if want == "" || p <= 0 {
+		return
+	}
+	if old, err := os.ReadFile(d.reloadPath()); err == nil && strings.TrimSpace(string(old)) == want {
+		return
+	}
+	if err := syscall.Kill(p, syscall.SIGHUP); err != nil {
+		return
+	}
+	os.WriteFile(d.reloadPath(), []byte(want), 0o600)
+	Events.Add("daemon", d.name, "", "settings reloaded (nobody disconnected)")
 }
 
 func fingerprint(parts ...string) string {
@@ -65,9 +91,11 @@ func (d *procDaemon) reapStale() {
 	old, err := os.ReadFile(hf)
 	if err != nil && d.adoptUnknown {
 		os.WriteFile(hf, []byte(d.hash), 0o600)
+		d.syncReload(p)
 		return
 	}
 	if err == nil && strings.TrimSpace(string(old)) == d.hash {
+		d.syncReload(p)
 		return
 	}
 	Events.Add("daemon", d.name, "", "config changed: restarting")
@@ -115,6 +143,11 @@ func (d *procDaemon) run() {
 			Events.Add("daemon", d.name, "", "started")
 			time.Sleep(500 * time.Millisecond)
 			os.WriteFile(d.hashPath(), []byte(d.hash), 0o600)
+			d.mu.Lock()
+			if d.reloadHash != "" { // a fresh daemon read the whole current config
+				os.WriteFile(d.reloadPath(), []byte(d.reloadHash), 0o600)
+			}
+			d.mu.Unlock()
 		}
 		backoff = time.Second
 		select {
@@ -149,6 +182,13 @@ func (s *daemonSet) apply(desired map[string]*procDaemon, keep map[string]bool) 
 	for k, want := range desired {
 		cur := s.m[k]
 		if cur != nil && cur.hash == want.hash {
+			cur.mu.Lock()
+			changed := want.reloadHash != "" && cur.reloadHash != want.reloadHash
+			cur.reloadHash = want.reloadHash
+			cur.mu.Unlock()
+			if changed {
+				go cur.syncReload(cur.pid())
+			}
 			continue
 		}
 		if cur != nil {

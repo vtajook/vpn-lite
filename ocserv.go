@@ -51,8 +51,12 @@ func ocservConf(in *Inbound, dir, run, radConf string) string {
 	w("max-ban-score = 0")
 	w("ban-reset-time = 60")
 	w("keepalive = 10")
-	w("dpd = 10")
-	w("mobile-dpd = 20")
+	// Clients declare the server dead after 2 x dpd without an answer, ocserv drops a silent
+	// client after 3 x dpd. 30 s: a client survives a 60 s network stall (the relay in front of
+	// the server has short outages) instead of reconnecting after 20 s. These lines are
+	// reloadable (see ocservReloadable): changing them never restarts ocserv.
+	w("dpd = 30")
+	w("mobile-dpd = 30")
 	w("switch-to-tcp-timeout = 25")
 	w("try-mtu-discovery = false")
 	w("mtu = %d", intSetting(s, "mtu", 1420))
@@ -77,6 +81,49 @@ func ocservConf(in *Inbound, dir, run, radConf string) string {
 	w("tls-priorities = \"NORMAL:%%SERVER_PRECEDENCE:%%COMPAT:-VERS-SSL3.0:-ARCFOUR-128\"")
 	w("log-level = 1")
 	return b.String()
+}
+
+// ocservReloadable: config keys ocserv re-reads on SIGHUP for new connections without
+// disconnecting anyone. They are left out of the restart fingerprint.
+var ocservReloadable = []string{"keepalive =", "dpd =", "mobile-dpd ="}
+
+// ocservRestartPart is the config without its reloadable lines.
+func ocservRestartPart(body string) string {
+	var b strings.Builder
+	for _, l := range strings.SplitAfter(body, "\n") {
+		skip := false
+		for _, k := range ocservReloadable {
+			if strings.HasPrefix(l, k) {
+				skip = true
+			}
+		}
+		if !skip {
+			b.WriteString(l)
+		}
+	}
+	return b.String()
+}
+
+// migrateOcservHash moves a running ocserv from the old fingerprint (whole config, file .hash)
+// to the new one (reloadable lines excluded, file .hash2) WITHOUT a restart, but only when it
+// provably runs the config on disk and that config differs from the new one in reloadable
+// lines at most. Anything else falls through to the normal check, which restarts it.
+func migrateOcservHash(conf, pid, body, hash, cert, key, secret string) {
+	if _, err := os.Stat(pid + ".hash2"); err == nil {
+		return
+	}
+	old, err1 := os.ReadFile(pid + ".hash")
+	disk, err2 := os.ReadFile(conf)
+	if err1 != nil || err2 != nil {
+		return
+	}
+	if strings.TrimSpace(string(old)) != fingerprint(string(disk), cert, key, secret, radDictionary) ||
+		ocservRestartPart(string(disk)) != ocservRestartPart(body) {
+		return
+	}
+	os.WriteFile(pid+".hash2", []byte(hash), 0o600)
+	// the running daemon has the timers that are on disk; a different value is applied by reload
+	os.WriteFile(pid+".rhash", []byte(fingerprint(string(disk))), 0o600)
 }
 
 func (e *Engine) ocservDaemons(dir, run, secret string) (out map[string]*procDaemon, keep map[string]bool) {
@@ -121,11 +168,13 @@ func (e *Engine) ocservDaemons(dir, run, secret string) (out map[string]*procDae
 		}
 		body := ocservConf(in, d, run, radConf)
 		conf := filepath.Join(d, "ocserv.conf")
+		pid := filepath.Join(run, fmt.Sprintf("ocserv-%d.pid", in.ID))
+		hash := fingerprint(ocservRestartPart(body), cert, key, secret, radDictionary)
+		migrateOcservHash(conf, pid, body, hash, cert, key, secret)
 		writeIfChanged(conf, body, 0o600)
 		out[fmt.Sprint(in.ID)] = &procDaemon{name: fmt.Sprintf("ocserv-%d", in.ID), bin: bin,
-			args:    []string{"-c", conf},
-			pidFile: filepath.Join(run, fmt.Sprintf("ocserv-%d.pid", in.ID)), match: "ocserv",
-			hash: fingerprint(body, cert, key, secret, radDictionary)}
+			args: []string{"-c", conf}, pidFile: pid, match: "ocserv",
+			hashFile: pid + ".hash2", hash: hash, reloadHash: fingerprint(body)}
 	}
 	return
 }

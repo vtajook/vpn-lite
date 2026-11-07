@@ -4,6 +4,9 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -217,5 +220,89 @@ func TestPppOptionsDoNotRestartXl2tpd(t *testing.T) {
 	opt := pppOptions(in, "/r")
 	if !strings.Contains(opt, "lcp-echo-interval 10") || !strings.Contains(opt, "lcp-echo-failure 6") {
 		t.Fatalf("dead-peer detection should allow 60 s:\n%s", opt)
+	}
+}
+
+// Changing only ocserv's timers must reload it (SIGHUP), never restart it; anything else still restarts.
+func TestOcservTimersReloadNotRestart(t *testing.T) {
+	in := &Inbound{ID: 6, Port: 443, Protocol: "openconnect", Settings: map[string]any{}}
+	body := ocservConf(in, "/d", "/r", "/rad")
+	for _, want := range []string{"dpd = 30\n", "mobile-dpd = 30\n"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q", want)
+		}
+	}
+	old := strings.Replace(strings.Replace(body, "dpd = 30", "dpd = 10", 1), "mobile-dpd = 30", "mobile-dpd = 20", 1)
+	if ocservRestartPart(old) != ocservRestartPart(body) {
+		t.Fatal("timer change must not change the restart fingerprint")
+	}
+	if ocservRestartPart(strings.Replace(body, "route = default", "route = 1.0.0.0/255.0.0.0", 1)) == ocservRestartPart(body) {
+		t.Fatal("a route change must still restart")
+	}
+
+	// migration from the old scheme: only when the running daemon provably runs the disk config
+	dir := t.TempDir()
+	conf, pid := dir+"/ocserv.conf", dir+"/ocserv-6.pid"
+	os.WriteFile(conf, []byte(old), 0o600)
+	os.WriteFile(pid+".hash", []byte(fingerprint(old, "C", "K", "S", radDictionary)), 0o600)
+	newHash := fingerprint(ocservRestartPart(body), "C", "K", "S", radDictionary)
+	migrateOcservHash(conf, pid, body, newHash, "C", "K", "S")
+	if b, _ := os.ReadFile(pid + ".hash2"); string(b) != newHash {
+		t.Fatal("running ocserv not adopted under the new fingerprint")
+	}
+	if b, _ := os.ReadFile(pid + ".rhash"); string(b) != fingerprint(old) {
+		t.Fatal("reload fingerprint must describe what the daemon runs now")
+	}
+	os.Remove(pid + ".hash2")
+	os.WriteFile(pid+".hash", []byte("someotherhash"), 0o600) // started with another config
+	migrateOcservHash(conf, pid, body, newHash, "C", "K", "S")
+	if _, err := os.Stat(pid + ".hash2"); err == nil {
+		t.Fatal("a daemon with an unknown config must not be adopted")
+	}
+}
+
+// The reload itself: a real process gets SIGHUP and keeps running.
+func TestDaemonReloadSendsHup(t *testing.T) {
+	dir := t.TempDir()
+	mark := dir + "/hup"
+	cmd := exec.Command("sh", "-c", `trap "echo hup >> `+mark+`" HUP; touch `+dir+`/ready; while :; do sleep 0.05; done`)
+	if err := cmd.Start(); err != nil {
+		t.Skip(err)
+	}
+	defer cmd.Process.Kill()
+	for i := 0; i < 100; i++ { // the handler must be installed before the first signal
+		if _, err := os.Stat(dir + "/ready"); err == nil {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	pid := dir + "/d.pid"
+	os.WriteFile(pid, []byte(strconv.Itoa(cmd.Process.Pid)), 0o600)
+	d := &procDaemon{name: "oc", pidFile: pid, hashFile: pid + ".hash2", match: "while", hash: "h", reloadHash: "r2", stop: make(chan struct{})}
+	os.WriteFile(pid+".hash2", []byte("h"), 0o600)
+	os.WriteFile(pid+".rhash", []byte("r1"), 0o600)
+	hups := func() int { b, _ := os.ReadFile(mark); return strings.Count(string(b), "hup") }
+	waitHups := func(n int) {
+		for i := 0; i < 40 && hups() < n; i++ {
+			time.Sleep(50 * time.Millisecond)
+		}
+		if hups() != n {
+			t.Fatalf("got %d reloads, want %d", hups(), n)
+		}
+	}
+	d.reapStale() // same restart fingerprint, new reload fingerprint: reload, no restart
+	waitHups(1)
+	if d.pid() == 0 {
+		t.Fatal("daemon was stopped")
+	}
+	d.reapStale() // nothing changed: no second reload
+	time.Sleep(150 * time.Millisecond)
+	waitHups(1)
+	ds := newDaemonSet() // and inside a running panel, when the settings change
+	ds.m["6"] = d
+	ds.apply(map[string]*procDaemon{"6": {hash: "h", reloadHash: "r3"}}, nil)
+	waitHups(2)
+	if ds.m["6"] != d || d.pid() == 0 {
+		t.Fatal("daemon replaced or stopped instead of reloaded")
 	}
 }
