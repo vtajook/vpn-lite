@@ -86,9 +86,12 @@ type GlobalSettings struct {
 	DefaultSingleProto bool `json:"defaultSingleProto"`
 	// AllowMultiProto lets one account be connected on several protocols at the same time.
 	// Off (the default): while an account is connected on one protocol, a login on another is refused.
-	AllowMultiProto bool   `json:"allowMultiProto"`
-	TLSCert         string `json:"tlsCert"` // panel HTTPS certificate path (empty = HTTP or self-signed)
-	TLSKey          string `json:"tlsKey"`
+	AllowMultiProto bool `json:"allowMultiProto"`
+	// DefaultLimit is the number of simultaneous connections (all protocols together) of an
+	// account whose own limit is 0.
+	DefaultLimit int    `json:"defaultLimit"`
+	TLSCert      string `json:"tlsCert"` // panel HTTPS certificate path (empty = HTTP or self-signed)
+	TLSKey       string `json:"tlsKey"`
 	// Scheduled backup to a Telegram bot.
 	TgToken       string `json:"tgToken"`
 	TgChat        string `json:"tgChat"`
@@ -162,8 +165,11 @@ func OpenStore(path string) (*Store, error) {
 	if g.SessionMinutes == 0 {
 		g.SessionMinutes = 1440
 	}
+	if g.DefaultLimit < 1 {
+		g.DefaultLimit = 1
+	}
 	if g.LimitStrategy == "" {
-		g.LimitStrategy = "evict"
+		g.LimitStrategy = "reject"
 	}
 	if g.EvictGraceSec == 0 {
 		g.EvictGraceSec = 30

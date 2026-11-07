@@ -83,6 +83,15 @@ func stateFromVpnUiDB(data []byte) (*State, int, error) {
 			st.NextInbound = id + 1
 		}
 	}
+	if tsx := tabs["settings"]; tsx != nil { // the old panel's default device limit
+		for _, r := range tsx.Rows {
+			if asStr(g(tsx, r, "key")) == "globalUserLimitDefault" {
+				if n := asInt(g(tsx, r, "value")); n >= 1 {
+					st.Global.DefaultLimit = int(n)
+				}
+			}
+		}
+	}
 	traffic := map[string][]any{}
 	if tc != nil {
 		for _, r := range tc.Rows {

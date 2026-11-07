@@ -163,9 +163,13 @@ func (s *Store) checkAccount(inboundID int, user string, verify func(stored stri
 	case in.ExpiryTime > 0 && in.ExpiryTime <= now:
 		res.Reason = "inbound expired"
 	}
+	// the cap lives on the account and counts connections of ALL protocols together
 	limit := acc.LimitIP
 	if limit <= 0 {
-		limit = intSetting(in.Settings, "userLimit", 1)
+		limit = s.st.Global.DefaultLimit
+		if limit < 1 {
+			limit = 1
+		}
 	}
 	return res, limit
 }
@@ -210,7 +214,7 @@ func (s *Store) AuthorizeFn(inboundID int, user string, verify func(stored strin
 			if protoFamily(s.Proto) == res.Family {
 				same = append(same, s)
 			} else {
-				return deny("account is already connected on another protocol")
+				return deny("device limit reached (account is connected on another protocol)")
 			}
 		}
 	}

@@ -60,6 +60,7 @@ func seed(st *Store) {
 func TestOvpnManagementAuth(t *testing.T) {
 	st := testStore(t)
 	seed(st)
+	st.st.Global.LimitStrategy = "evict" // the optional policy; the default is "reject"
 	m := &OvpnManager{st: st}
 	inst := &ovpnInst{m: m, id: 1, proto: "udp", key: "1-udp"}
 	srv, cli := net.Pipe()
@@ -837,5 +838,51 @@ func TestOcservBanDisabled(t *testing.T) {
 	c := ocservConf(in, "/d", "/r", "/r.conf")
 	if !strings.Contains(c, "max-ban-score = 0") {
 		t.Fatal("ocserv must not ban the shared relay address")
+	}
+}
+
+func TestDefaultPolicyRejectsNewConnectionWhenFull(t *testing.T) {
+	st := testStore(t)
+	seed(st) // alice: limit 0 -> panel default 1, member of openvpn and l2tp
+	if st.st.Global.LimitStrategy != "reject" || st.st.Global.DefaultLimit != 1 {
+		t.Fatalf("defaults: %q %d", st.st.Global.LimitStrategy, st.st.Global.DefaultLimit)
+	}
+	pass := func(stored string) bool { return stored == "secret" }
+	if r := st.AuthorizeFn(1, "alice", pass, &Session{ID: "s1", Proto: "openvpn-udp"}); !r.OK {
+		t.Fatalf("first login: %q", r.Reason)
+	}
+	Sessions.mu.Lock()
+	Sessions.byID["s1"].Start -= 3600_000 // however old the running session is, it is never evicted
+	Sessions.mu.Unlock()
+	for _, in := range []int{1, 2} { // same protocol and another protocol: the same refusal
+		r := st.AuthorizeFn(in, "alice", pass, &Session{ID: fmt.Sprint("x", in), Proto: map[int]string{1: "openvpn-tcp", 2: "l2tp"}[in]})
+		if r.OK || !strings.Contains(r.Reason, "device limit reached") {
+			t.Fatalf("inbound %d: new connection must be refused with the limit error: %+v", in, r)
+		}
+	}
+	// a limit of 2 on the account (not on the inbound) allows a second device
+	st.st.Accounts["alice@x"].LimitIP = 2
+	if r := st.AuthorizeFn(1, "alice", pass, &Session{ID: "s2", Proto: "openvpn-udp"}); !r.OK {
+		t.Fatalf("second device within the account limit: %q", r.Reason)
+	}
+	if r := st.AuthorizeFn(1, "alice", pass, &Session{ID: "s3", Proto: "openvpn-udp"}); r.OK {
+		t.Fatal("third device must be refused")
+	}
+}
+
+// The server config built from the old panel's OpenVPN settings must accept the profiles
+// the old panel gave out (same CA, tls-crypt key, auth digest, cipher list, credentials only).
+func TestOvpnServerAcceptsOldProfiles(t *testing.T) {
+	in := &Inbound{ID: 5, Enable: true, Port: 1001, Protocol: "openvpn", Settings: map[string]any{
+		"ciphers":  []any{"AES-256-GCM", "AES-128-GCM", "CHACHA20-POLY1305", "AES-256-CBC", "AES-192-CBC", "AES-128-CBC", "BF-CBC", "DES-EDE3-CBC"},
+		"tlsCrypt": "KEY", "tcpPort": float64(1194), "separatePorts": false, "udpEnable": true, "tcpEnable": true, "mtu": float64(1350)}}
+	for _, p := range []string{"udp", "tcp"} {
+		c := ovpnServerConfig(in, p, "/d", "/r")
+		for _, want := range []string{"port 1001", "auth SHA256", "tls-crypt /d/tc.key", "verify-client-cert none",
+			"username-as-common-name", "AES-256-CBC", "AES-256-GCM"} {
+			if !strings.Contains(c, want) {
+				t.Fatalf("%s config lacks %q:\n%s", p, want, c)
+			}
+		}
 	}
 }
