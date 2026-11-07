@@ -157,7 +157,14 @@ async function pAccounts(c){
   const names=Object.fromEntries(inboundsCache.map(i=>[i.id,i.remark||i.protocol]));
   const pages=Math.max(1,Math.ceil(r.total/r.size));
   const all=h("input",{type:"checkbox",onchange:e=>{r.items.forEach(a=>e.target.checked?AS.sel.add(a.email):AS.sel.delete(a.email));load()}});
-  body.replaceChildren(h("div",{class:"card sc"},r.items.length?h("table",{},h("tr",{},h("th",{},all),["name","protocols","used","expiry","speed","devices","status",""].map(k=>h("th",{},k?t(k==="name"?"name":k):""))),
+  const go=n=>{AS.page=n;load()};
+  const pager=()=>{const b=(n,label,dis,cur)=>h("button",{class:"btn s"+(cur?" p":""),disabled:dis,onclick:()=>go(n)},label||n);
+   const s=Math.max(1,Math.min(AS.page-2,pages-4)),e=Math.min(pages,s+4),nums=[];
+   if(s>1){nums.push(b(1));if(s>2)nums.push(h("span",{class:"mu"},"…"))}
+   for(let n=s;n<=e;n++)nums.push(b(n,null,false,n===AS.page));
+   if(e<pages){if(e<pages-1)nums.push(h("span",{class:"mu"},"…"));nums.push(b(pages))}
+   return h("div",{class:"pg"},h("span",{class:"mu"},r.total+" "+t("accounts")),b(AS.page-1,"‹",AS.page<=1),...nums,b(AS.page+1,"›",AS.page>=pages))};
+  body.replaceChildren(pager(),h("div",{class:"card sc"},r.items.length?h("table",{},h("tr",{},h("th",{},all),["name","protocols","used","expiry","speed","devices","status",""].map(k=>h("th",{},k?t(k==="name"?"name":k):""))),
    r.items.map(a=>{const pct=a.total?Math.min(100,(a.up+a.down)*100/a.total):0;
     return h("tr",{},h("td",{},h("input",{type:"checkbox",checked:AS.sel.has(a.email),onchange:e=>{e.target.checked?AS.sel.add(a.email):AS.sel.delete(a.email);drawBulk()}})),
      h("td",{},h("b",{},a.email),a.comment?h("div",{class:"mu"},a.comment):null),
@@ -169,8 +176,7 @@ async function pAccounts(c){
      h("td",{},h("span",{class:"pill "+a.status},t(a.status))),
      h("td",{},h("button",{class:"btn s",onclick:()=>accountModal(a)},t("edit"))," ",h("button",{class:"btn s",onclick:()=>infoModal(a)},"ⓘ")))
    })):h("div",{class:"mu"},t("none"))),
-   h("div",{class:"pg"},h("span",{class:"mu"},r.total+" "+t("accounts")),h("button",{class:"btn s",disabled:AS.page<=1,onclick:()=>{AS.page--;load()}},"‹"),
-    h("span",{},t("page")+" "+AS.page+" "+t("of")+" "+pages),h("button",{class:"btn s",disabled:AS.page>=pages,onclick:()=>{AS.page++;load()}},"›")));drawBulk()}
+   pager());drawBulk()}
  function drawBulk(){if(!AS.sel.size){bulk.replaceChildren();return}
   const act=async(a,extra)=>{if(a==="delete"&&!confirm(t("confirm")))return;await post("panel/ui/bulk",{action:a,emails:[...AS.sel],...extra});toast(t("saved"));AS.sel.clear();load()};
   const days=h("input",{type:"number",value:30,style:"width:70px"}),gb=h("input",{type:"number",value:0,style:"width:70px"});
