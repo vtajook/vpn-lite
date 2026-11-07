@@ -151,6 +151,7 @@ func serve(args []string) error {
 	if err != nil {
 		return err
 	}
+	setIranDirect(st.st.Global.IranDirect)
 	if st.st.Admin.User == "" {
 		return fmt.Errorf("not set up yet: run `vpn-lite setup`")
 	}

@@ -928,3 +928,30 @@ func TestServiceTrafficCounters(t *testing.T) {
 		t.Fatalf("totals %d/%d", g.TotalUp, g.TotalDown)
 	}
 }
+
+func TestIranDirectRoutes(t *testing.T) {
+	defer setIranDirect(false)
+	ov := &Inbound{ID: 1, Protocol: "openvpn", Port: 1194, Settings: map[string]any{}}
+	oc := &Inbound{ID: 6, Protocol: "openconnect", Port: 1002, Settings: map[string]any{}}
+	setIranDirect(false)
+	ovOff := ovpnServerConfig(ov, "udp", "/d", "/r")
+	ocOff := ocservConf(oc, "/d", "/r", "/r.conf")
+	if strings.Contains(ovOff, "net_gateway") || strings.Contains(ocOff, "no-route") {
+		t.Fatal("routes must be absent when the option is off")
+	}
+	if n := len(iranPrefixes()); n < 1000 {
+		t.Fatalf("embedded Iran list too small: %d", n)
+	}
+	setIranDirect(true)
+	ovOn := ovpnServerConfig(ov, "udp", "/d", "/r")
+	ocOn := ocservConf(oc, "/d", "/r", "/r.conf")
+	if !strings.Contains(ovOn, `push "route 2.144.0.0 255.252.0.0 net_gateway"`) || !strings.Contains(ovOn, "redirect-gateway def1") {
+		t.Fatal("openvpn: Iran routes missing or redirect-gateway lost")
+	}
+	if !strings.Contains(ocOn, "no-route = 2.144.0.0/255.252.0.0") || !strings.Contains(ocOn, "route = default") {
+		t.Fatal("ocserv: Iran routes missing or default route lost")
+	}
+	if ovOn == ovOff || ocOn == ocOff {
+		t.Fatal("config must change so the daemon restarts")
+	}
+}

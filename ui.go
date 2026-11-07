@@ -482,6 +482,9 @@ func (a *API) uiSetSettings(w http.ResponseWriter, r *http.Request) {
 	cur.LimitStrategy, cur.EvictGraceSec = g.LimitStrategy, g.EvictGraceSec
 	cur.DefaultSingleProto = g.DefaultSingleProto
 	cur.AllowMultiProto = g.AllowMultiProto
+	routeChanged := cur.IranDirect != g.IranDirect
+	cur.IranDirect = g.IranDirect
+	setIranDirect(cur.IranDirect)
 	if g.DefaultLimit >= 1 {
 		cur.DefaultLimit = g.DefaultLimit
 	}
@@ -498,6 +501,9 @@ func (a *API) uiSetSettings(w http.ResponseWriter, r *http.Request) {
 	cur.BasePath, cur.TLSCert, cur.TLSKey = bp, strings.TrimSpace(g.TLSCert), strings.TrimSpace(g.TLSKey)
 	a.st.touch()
 	a.st.mu.Unlock()
+	if routeChanged {
+		a.d.ReloadInbound(0) // regenerate the OpenVPN/Cisco configs; the daemons restart once
+	}
 	ok(w, "saved; base path and TLS changes apply after a panel restart", nil)
 }
 
@@ -758,6 +764,10 @@ func (a *API) uiRestore(w http.ResponseWriter, r *http.Request) {
 	a.st.rebaseTotalLocked()
 	g := &a.st.st.Global
 	g.LimitStrategy, g.EvictGraceSec, g.DefaultSingleProto, g.AllowMultiProto = in.Global.LimitStrategy, in.Global.EvictGraceSec, in.Global.DefaultSingleProto, in.Global.AllowMultiProto
+	if !fromDB {
+		g.IranDirect = in.Global.IranDirect
+		setIranDirect(g.IranDirect)
+	}
 	if in.Global.DefaultLimit >= 1 {
 		g.DefaultLimit = in.Global.DefaultLimit
 	}

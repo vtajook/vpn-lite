@@ -114,6 +114,11 @@ func ovpnServerConfig(in *Inbound, proto, dir, runDir string) string {
 	w("username-as-common-name")
 	w("verify-client-cert none")
 	w(`push "redirect-gateway def1 bypass-dhcp"`)
+	if iranDirectOn.Load() { // Iranian addresses bypass the tunnel
+		for _, r := range iranRouteLines(`push "route %s %s net_gateway"`) {
+			w("%s", r)
+		}
+	}
 	w(`push "dhcp-option DNS %s"`, dns1)
 	w(`push "dhcp-option DNS %s"`, dns2)
 	w(`push "block-ipv6"`)

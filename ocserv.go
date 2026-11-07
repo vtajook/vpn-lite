@@ -66,6 +66,11 @@ func ocservConf(in *Inbound, dir, run, radConf string) string {
 	w("dns = %s", strSetting(s, "dns1", "8.8.8.8"))
 	w("dns = %s", strSetting(s, "dns2", "8.8.4.4"))
 	w("route = default")
+	if iranDirectOn.Load() { // Iranian addresses bypass the tunnel
+		for _, r := range iranRouteLines("no-route = %s/%s") {
+			w("%s", r)
+		}
+	}
 	w("cisco-client-compat = true")
 	w("dtls-legacy = true")
 	w("tls-priorities = \"NORMAL:%%SERVER_PRECEDENCE:%%COMPAT:-VERS-SSL3.0:-ARCFOUR-128\"")

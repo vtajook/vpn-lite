@@ -90,6 +90,8 @@ type GlobalSettings struct {
 	// AllowMultiProto lets one account be connected on several protocols at the same time.
 	// Off (the default): while an account is connected on one protocol, a login on another is refused.
 	AllowMultiProto bool `json:"allowMultiProto"`
+	// IranDirect: OpenVPN and Cisco clients reach Iranian IP ranges directly instead of through the tunnel.
+	IranDirect bool `json:"iranDirect"`
 	// DefaultLimit is the number of simultaneous connections (all protocols together) of an
 	// account whose own limit is 0.
 	DefaultLimit int    `json:"defaultLimit"`
