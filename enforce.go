@@ -31,11 +31,13 @@ type Session struct {
 
 // deadAfterMs: a session whose client has sent nothing for this long is a connection the daemon
 // has not noticed is gone yet (phone changed network, app was killed). OpenVPN clients send a
-// keepalive every 5 s and the counters arrive every 10 s; L2TP and Cisco counters arrive once
-// a minute.
+// keepalive every 5 s (pushed "ping 5", counted in the link bytes) and the counters arrive every
+// 5 s, so 15 s of silence means the client has moved on: a reconnecting phone gets in within
+// about 15 s instead of being refused until the daemon's own 40 s timeout. L2TP and Cisco
+// counters arrive once a minute.
 func deadAfterMs(proto string) int64 {
 	if protoFamily(proto) == "openvpn" {
-		return 30_000
+		return 15_000
 	}
 	return 150_000
 }

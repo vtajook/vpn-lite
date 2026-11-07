@@ -262,7 +262,7 @@ func (i *ovpnInst) attach() {
 	i.conn = conn
 	i.wmu.Unlock()
 	defer func() { conn.Close() }()
-	i.send("bytecount 10")
+	i.send("bytecount 5") // also the liveness signal: a live client sends at least a keepalive every 5 s
 	i.send("status 3")
 	i.readLoop(conn)
 }
