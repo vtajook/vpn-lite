@@ -18,6 +18,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .main{flex:1;min-width:0;padding:22px 26px}.top{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap}.top h2{margin:0;flex:1;font-size:21px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;box-shadow:var(--sh)}
 .dg{display:grid;gap:10px;grid-template-columns:repeat(3,1fr);margin-bottom:14px}@media(min-width:900px){.dg{grid-template-columns:repeat(4,1fr)}}
+.sw{appearance:none;-webkit-appearance:none;width:42px;height:24px;border-radius:12px;background:#94a3b8;position:relative;cursor:pointer;transition:background .15s;border:0;flex:none;vertical-align:middle}.sw:after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:inset-inline-start .15s;box-shadow:0 1px 3px rgba(0,0,0,.3)}.sw:checked{background:#10b981}.sw:checked:after{inset-inline-start:21px}
 .lk{cursor:pointer;transition:transform .12s}.lk:hover{transform:translateY(-2px)}.dc{padding:12px;margin:0;min-width:0}.dh{display:flex;align-items:center;gap:8px;margin-bottom:10px}.di{font-size:18px}.dl{font-size:12px;color:var(--mu);flex:1}
 .dv{font-size:20px;font-weight:700;color:var(--c)}.dm{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}.d2{display:flex;justify-content:space-between;font-size:11px;color:var(--mu);margin-top:6px;gap:4px;flex-wrap:wrap}
 .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));margin-bottom:14px}
@@ -186,7 +187,7 @@ async function pAccounts(c){
      h("td",{},fmtExp(a.expiry)),
      h("td",{class:"mu"},h("span",{class:"num"},(a.speedDown?"↓"+a.speedDown:"")+" "+(a.speedUp?"↑"+a.speedUp:"")||"-")),
      h("td",{},a.online?h("span",{class:"dot"}):null,h("span",{class:"num"},a.online+"/"+(a.limitIp||"·"))),
-     h("td",{},h("span",{class:"pill "+a.status},t(a.status))),
+     h("td",{style:"white-space:nowrap"},h("input",{type:"checkbox",class:"sw",checked:a.enable,title:t("enable"),onchange:async e=>{const on=e.target.checked;try{await bulkOne(on?"enable":"disable",a.email);toast(t("saved"))}catch(x){toast(x.message,1)}load()}})," ",h("span",{class:"pill "+a.status},t(a.status))),
      h("td",{},h("button",{class:"btn s",onclick:()=>accountModal(a)},t("edit"))," ",h("button",{class:"btn s",onclick:()=>infoModal(a)},"ⓘ")))
    })):h("div",{class:"mu"},t("none"))),
    pager());drawBulk()}
@@ -212,7 +213,7 @@ function accountModal(a){const isNew=!a;a=a||{email:"",username:"",password:rand
   field(t("single"),h("div",{style:"flex:1"},f.single,h("div",{class:"mu"},t("singleh")))),field(t("enable"),f.en)),[
   !isNew&&h("button",{class:"btn d",onclick:async()=>{if(!confirm(t("confirm")))return;await bulkOne("delete",a.email);m.remove()}},t("del")),
   !isNew&&h("button",{class:"btn",onclick:async()=>{await bulkOne("reset",a.email);toast(t("saved"))}},t("reset")),
-  !isNew&&h("button",{class:"btn",onclick:async()=>{await post("panel/ui/kick?email="+encodeURIComponent(a.email));toast(t("saved"))}},t("kick")),
+  !isNew&&h("button",{class:"btn",onclick:async()=>{const n=await post("panel/ui/kick?email="+encodeURIComponent(a.email));toast(n?t("kick")+": "+n:t("none"),!n)}},t("kick")),
   h("button",{class:"btn",onclick:()=>m.remove()},t("cancel")),
   h("button",{class:"btn p",onclick:async()=>{
    const ids=boxes.filter(([i,b])=>b.checked).map(([i])=>i.id);if(!ids.length){toast(t("protocols"),1);return}

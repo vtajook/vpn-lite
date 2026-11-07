@@ -131,6 +131,16 @@ func (e *Engine) l2tpDaemons(dir, run string, secret string) map[string]*procDae
 // and pppd keeps /var/run/ppp<unit>.pid for that link.
 func killPPP(s *Session) {
 	dev := s.Dev
+	if dev == "" && s.VIP != "" { // find the link by its peer address
+		if out, err := exec.Command("ip", "-4", "-o", "addr", "show").Output(); err == nil {
+			for _, l := range strings.Split(string(out), "\n") {
+				if f := strings.Fields(l); len(f) > 3 && strings.HasPrefix(f[1], "ppp") && strings.Contains(l, "peer "+s.VIP+"/") {
+					dev = f[1]
+					break
+				}
+			}
+		}
+	}
 	if dev == "" || !strings.HasPrefix(dev, "ppp") {
 		return
 	}

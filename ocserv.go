@@ -120,10 +120,11 @@ func (e *Engine) ocservDaemons(dir, run, secret string) map[string]*procDaemon {
 // id, so the session is found by its tunnel address (every string field is compared,
 // which keeps this independent of occtl's exact JSON key names between versions).
 func killOcserv(run string, s *Session) {
-	if s.VIP == "" {
+	sock := filepath.Join(run, fmt.Sprintf("occtl-%d.sock", s.InboundID))
+	if s.VIP == "" { // no tunnel address known: drop by user name
+		exec.Command("occtl", "-s", sock, "disconnect", "user", s.Email).Run()
 		return
 	}
-	sock := filepath.Join(run, fmt.Sprintf("occtl-%d.sock", s.InboundID))
 	out, err := exec.Command("occtl", "-s", sock, "-j", "show", "users").Output()
 	if err != nil {
 		return
