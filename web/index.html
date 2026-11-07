@@ -18,7 +18,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .main{flex:1;min-width:0;padding:22px 26px}.top{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap}.top h2{margin:0;flex:1;font-size:21px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;box-shadow:var(--sh)}
 .dg{display:grid;gap:10px;grid-template-columns:repeat(3,1fr);margin-bottom:14px}@media(min-width:900px){.dg{grid-template-columns:repeat(4,1fr)}}
-.dc{padding:12px;margin:0;min-width:0}.dh{display:flex;align-items:center;gap:8px;margin-bottom:10px}.di{font-size:18px}.dl{font-size:12px;color:var(--mu);flex:1}
+.lk{cursor:pointer;transition:transform .12s}.lk:hover{transform:translateY(-2px)}.dc{padding:12px;margin:0;min-width:0}.dh{display:flex;align-items:center;gap:8px;margin-bottom:10px}.di{font-size:18px}.dl{font-size:12px;color:var(--mu);flex:1}
 .dv{font-size:20px;font-weight:700;color:var(--c)}.dm{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}.d2{display:flex;justify-content:space-between;font-size:11px;color:var(--mu);margin-top:6px;gap:4px;flex-wrap:wrap}
 .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));margin-bottom:14px}
 .stat{position:relative;overflow:hidden;padding-inline-start:20px}.stat:before{content:"";position:absolute;inset-block:0;inset-inline-start:0;width:5px;background:var(--c,var(--pr))}
@@ -130,14 +130,15 @@ async function doUpdate(){const j=await api("panel/ui/updateCheck");if(!j.succes
 async function pDash(c){
  const draw=async()=>{const s=await call("panel/ui/summary");const st=s.status||{};inboundsCache=s.inbounds;
   const sy=s.sys,pc=n=>Math.max(0,Math.min(100,n||0));
-  const box=(ic,col,l,body)=>h("div",{class:"card dc",style:"--c:"+col},h("div",{class:"dh"},h("span",{class:"di"},ic),h("span",{class:"dl"},l)),body);
+  const jump=(pg,st)=>()=>{if(pg==="accounts"){AS.status=st||"";AS.q="";AS.inbound="";AS.page=1;AS.sel.clear()}page=pg;render()};
+  const box=(ic,col,l,body,go)=>h("div",{class:"card dc"+(go?" lk":""),style:"--c:"+col,onclick:go||null},h("div",{class:"dh"},h("span",{class:"di"},ic),h("span",{class:"dl"},l)),body);
   const big=v=>h("div",{class:"dv num"},v);
   const meter=(p,left,right)=>h("div",{},h("div",{class:"dm"},h("span",{},left),h("b",{class:"num"},Math.round(p)+"%")),h("div",{class:"bar"+(p>90?" hi":"")},h("i",{style:"width:"+pc(p)+"%"})),right?h("div",{class:"mu num",style:"margin-top:4px;font-size:11px"},right):null);
   const two=(a,b)=>h("div",{class:"d2"},h("span",{class:"num"},"⬆ "+a),h("span",{class:"num"},"⬇ "+b));
   c.replaceChildren(h("div",{class:"top"},h("h2",{},t("dash"))),
    h("div",{class:"dg"},
-    box("👥","#6366f1",t("accounts"),big(s.accounts)),box("🌐","#10b981",t("onlineu"),big(s.onlineUsers)),box("✅","#3b82f6",t("active"),big(st.active||0)),
-    box("🚫","#f59e0b",t("disabled"),big(st.disabled||0)),box("📦","#ef4444",t("depleted"),big(st.depleted||0)),box("📅","#ef4444",t("expired"),big(st.expired||0)),
+    box("👥","#6366f1",t("accounts"),big(s.accounts),jump("accounts","")),box("🌐","#10b981",t("onlineu"),big(s.onlineUsers),jump("online")),box("✅","#3b82f6",t("active"),big(st.active||0),jump("accounts","active")),
+    box("🚫","#f59e0b",t("disabled"),big(st.disabled||0),jump("accounts","disabled")),box("📦","#ef4444",t("depleted"),big(st.depleted||0),jump("accounts","depleted")),box("📅","#ef4444",t("expired"),big(st.expired||0),jump("accounts","expired")),
     box("💾","#10b981",t("disk"),meter(sy.disk,fmtB(sy.diskUsed||0),fmtB(sy.diskTotal||0))),
     box("🧠","#06b6d4",t("cpu"),meter(sy.cpu,"Cores: "+(sy.cores||"-"),sy.load||"")),
     box("🧮","#eab308","RAM",meter(sy.mem,fmtB(sy.memUsed||0),fmtB(sy.memTotal||0))),
