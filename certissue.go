@@ -105,7 +105,14 @@ func (a *API) uiCertIssue(w http.ResponseWriter, r *http.Request) {
 			tail = tail[len(tail)-600:]
 		}
 		Events.Add("error", "openconnect", "", "certificate for %s failed: %s", dom, strings.TrimSpace(tail))
-		fail(w, "Let's Encrypt refused: "+strings.TrimSpace(tail))
+		msg := "Let's Encrypt refused: " + strings.TrimSpace(tail)
+		if !anyLocalIP(ips) {
+			msg = "The domain " + dom + " points to " + ips[0].String() + ", which is not this server. Let's Encrypt must reach port 80 of the address in the DNS record, " +
+				"so this fails when a relay/forwarder sits in front (it usually forwards only the VPN ports). " +
+				"You do not need this: the built-in self-signed certificate works for VPN clients. " +
+				"(Only the panel domain needs a real certificate.)  Details: " + strings.TrimSpace(tail)
+		}
+		fail(w, msg)
 		return
 	}
 	a.st.mu.Lock()
@@ -120,4 +127,22 @@ func (a *API) uiCertIssue(w http.ResponseWriter, r *http.Request) {
 	Events.Add("info", "openconnect", "", "inbound %d: Let's Encrypt certificate for %s obtained", id, dom)
 	a.d.ReloadInbound(id) // restart the daemon so it serves the new certificate
 	ok(w, strings.Join(append(steps, "certificate obtained: "+leStatus(dom)), " · "), nil)
+}
+
+// anyLocalIP reports whether one of the addresses belongs to a network interface of this machine.
+func anyLocalIP(ips []net.IP) bool {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return true // cannot tell: do not blame the DNS record
+	}
+	for _, a := range addrs {
+		if ipn, ok := a.(*net.IPNet); ok {
+			for _, ip := range ips {
+				if ip.Equal(ipn.IP) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
