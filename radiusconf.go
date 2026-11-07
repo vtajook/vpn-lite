@@ -59,14 +59,14 @@ ATTRIBUTE	NAS-Port-Id	87	string
 ATTRIBUTE	Message-Authenticator	80	string
 ATTRIBUTE	Connect-Info	77	string
 ATTRIBUTE	NAS-IPv6-Address	95	ipv6addr
-ATTRIBUTE	Framed-Interface-Id	96	ifid
-ATTRIBUTE	Framed-IPv6-Prefix	97	ipv6prefix
+ATTRIBUTE	Framed-Interface-Id	96	string
+ATTRIBUTE	Framed-IPv6-Prefix	97	string
 ATTRIBUTE	Framed-IPv6-Route	99	string
 ATTRIBUTE	Framed-IPv6-Pool	100	string
-ATTRIBUTE	Delegated-IPv6-Prefix	123	ipv6prefix
-ATTRIBUTE	Framed-IPv6-Address	168	ipv6addr
-ATTRIBUTE	DNS-Server-IPv6-Address	169	ipv6addr
-ATTRIBUTE	Route-IPv6-Information	170	ipv6prefix
+ATTRIBUTE	Delegated-IPv6-Prefix	123	string
+ATTRIBUTE	Framed-IPv6-Address	168	string
+ATTRIBUTE	DNS-Server-IPv6-Address	169	string
+ATTRIBUTE	Route-IPv6-Information	170	string
 
 VALUE	Service-Type	Login-User	1
 VALUE	Service-Type	Framed-User	2

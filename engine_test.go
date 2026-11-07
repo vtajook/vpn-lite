@@ -706,6 +706,9 @@ func TestReapStaleDaemon(t *testing.T) {
 	pf := filepath.Join(dir, "d.pid")
 	os.WriteFile(pf, []byte(fmt.Sprint(cmd.Process.Pid)), 0o600)
 	d := &procDaemon{name: "t", pidFile: pf, match: "sleep", hash: "new"}
+	for i := 0; i < 100 && d.pid() == 0; i++ { // the child shows its final command line only after exec
+		time.Sleep(10 * time.Millisecond)
+	}
 	// unknown hash + adoptUnknown: left running
 	d.adoptUnknown = true
 	d.reapStale()
@@ -717,5 +720,17 @@ func TestReapStaleDaemon(t *testing.T) {
 	d.reapStale()
 	if d.pid() != 0 {
 		t.Fatal("stale daemon still running")
+	}
+}
+
+// radcli (ocserv) refuses to start when a dictionary line has a type it does not know
+// ("invalid type on line N"), so only the types seen to work are allowed.
+func TestRadiusDictionaryTypesAreSafe(t *testing.T) {
+	ok := map[string]bool{"string": true, "integer": true, "ipaddr": true, "ipv6addr": true}
+	for i, ln := range strings.Split(radDictionary, "\n") {
+		f := strings.Fields(ln)
+		if len(f) >= 4 && f[0] == "ATTRIBUTE" && !ok[f[3]] {
+			t.Fatalf("dictionary line %d has type %q", i+1, f[3])
+		}
 	}
 }
