@@ -46,6 +46,10 @@ func ocservConf(in *Inbound, dir, run, radConf string) string {
 	w("isolate-workers = false")
 	w("max-clients = 0")
 	w("max-same-clients = 0") // the panel enforces the device cap
+	// Behind a relay every customer arrives from the same source address: ocserv's default
+	// "ban an address after a few failed logins" would lock every customer out at once.
+	w("max-ban-score = 0")
+	w("ban-reset-time = 60")
 	w("keepalive = 20")
 	w("dpd = 30")
 	w("mobile-dpd = 60")

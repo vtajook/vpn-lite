@@ -734,3 +734,11 @@ func TestRadiusDictionaryTypesAreSafe(t *testing.T) {
 		}
 	}
 }
+
+func TestOcservBanDisabled(t *testing.T) {
+	in := &Inbound{ID: 6, Protocol: "openconnect", Port: 1002, Settings: map[string]any{}}
+	c := ocservConf(in, "/d", "/r", "/r.conf")
+	if !strings.Contains(c, "max-ban-score = 0") {
+		t.Fatal("ocserv must not ban the shared relay address")
+	}
+}
