@@ -302,7 +302,8 @@ func (a *API) uiBulk(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Action string   `json:"action"`
 		Emails []string `json:"emails"`
-		Days   int      `json:"days"`
+		Days   float64  `json:"days"`
+		Hours  float64  `json:"hours"`
 		GB     float64  `json:"gb"`
 	}
 	if json.NewDecoder(r.Body).Decode(&req) != nil || len(req.Emails) == 0 {
@@ -328,12 +329,12 @@ func (a *API) uiBulk(w http.ResponseWriter, r *http.Request) {
 		case "reset":
 			acc.Up, acc.Down = 0, 0
 		case "extend":
-			if req.Days > 0 {
+			if req.Days+req.Hours > 0 {
 				base := acc.ExpiryTime
 				if base < nowMs() {
 					base = nowMs()
 				}
-				acc.ExpiryTime = base + int64(req.Days)*86400000
+				acc.ExpiryTime = base + int64((req.Days*24+req.Hours)*3600000)
 			}
 			if req.GB > 0 && acc.TotalGB > 0 {
 				acc.TotalGB += int64(req.GB * 1073741824)
@@ -375,7 +376,8 @@ func (a *API) uiBulkCreate(w http.ResponseWriter, r *http.Request) {
 		Count     int     `json:"count"`
 		Inbounds  []int   `json:"inbounds"`
 		GB        float64 `json:"gb"`
-		Days      int     `json:"days"`
+		Days      float64 `json:"days"`
+		Hours     float64 `json:"hours"`
 		LimitIP   int     `json:"limitIp"`
 		SpeedDown int     `json:"speedDown"`
 		SpeedUp   int     `json:"speedUp"`
@@ -409,8 +411,8 @@ func (a *API) uiBulkCreate(w http.ResponseWriter, r *http.Request) {
 	type made struct{ User, Pass string }
 	var out []made
 	exp := int64(0)
-	if req.Days > 0 {
-		exp = nowMs() + int64(req.Days)*86400000
+	if req.Days+req.Hours > 0 {
+		exp = nowMs() + int64((req.Days*24+req.Hours)*3600000)
 	}
 	n := 0
 	for i := 1; len(out) < req.Count && n < 100000; i++ {
