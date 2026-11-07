@@ -23,7 +23,9 @@ type procDaemon struct {
 	pidFile string
 	match   string // substring of /proc/<pid>/cmdline identifying our process
 	hash    string // fingerprint of config; a change restarts the daemon
-	stop    chan struct{}
+	// adoptUnknown: a daemon started before hashes were recorded is adopted as it is instead of restarted.
+	adoptUnknown bool
+	stop         chan struct{}
 }
 
 func fingerprint(parts ...string) string {
@@ -49,8 +51,37 @@ func (d *procDaemon) pid() int {
 	return 0
 }
 
+// reapStale stops a daemon that survived a panel restart but runs with an older config than
+// the one wanted now (the in-memory hash check cannot see that, the panel process is new).
+func (d *procDaemon) reapStale() {
+	p := d.pid()
+	if p == 0 {
+		return
+	}
+	hf := d.pidFile + ".hash"
+	old, err := os.ReadFile(hf)
+	if err != nil && d.adoptUnknown {
+		os.WriteFile(hf, []byte(d.hash), 0o600)
+		return
+	}
+	if err == nil && strings.TrimSpace(string(old)) == d.hash {
+		return
+	}
+	Events.Add("daemon", d.name, "", "config changed: restarting")
+	syscall.Kill(p, syscall.SIGTERM)
+	for i := 0; i < 50 && d.pid() != 0; i++ {
+		time.Sleep(100 * time.Millisecond)
+	}
+	if p := d.pid(); p > 0 {
+		syscall.Kill(p, syscall.SIGKILL)
+		time.Sleep(200 * time.Millisecond)
+	}
+	os.Remove(d.pidFile)
+}
+
 func (d *procDaemon) run() {
 	backoff := time.Second
+	d.reapStale()
 	for {
 		select {
 		case <-d.stop:
@@ -73,6 +104,7 @@ func (d *procDaemon) run() {
 			}
 			Events.Add("daemon", d.name, "", "started")
 			time.Sleep(500 * time.Millisecond)
+			os.WriteFile(d.pidFile+".hash", []byte(d.hash), 0o600)
 		}
 		backoff = time.Second
 		select {

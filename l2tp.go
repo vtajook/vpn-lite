@@ -120,7 +120,7 @@ func (e *Engine) l2tpDaemons(dir, run string, secret string) map[string]*procDae
 		writeIfChanged(opt, optBody, 0o600)
 		writeIfChanged(conf, confBody, 0o600)
 		pid := filepath.Join(run, fmt.Sprintf("xl2tpd-%d.pid", in.ID))
-		out[fmt.Sprint(in.ID)] = &procDaemon{name: fmt.Sprintf("xl2tpd-%d", in.ID), bin: bin,
+		out[fmt.Sprint(in.ID)] = &procDaemon{adoptUnknown: true, name: fmt.Sprintf("xl2tpd-%d", in.ID), bin: bin,
 			args:    []string{"-c", conf, "-p", pid, "-C", filepath.Join(run, fmt.Sprintf("l2tp-%d.control", in.ID))},
 			pidFile: pid, match: "xl2tpd", hash: fingerprint(optBody, confBody, secret)}
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/md5"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -691,5 +693,29 @@ func TestRadiusDictionaryHasOcservAttributes(t *testing.T) {
 		if !strings.Contains(radDictionary, a) {
 			t.Fatalf("dictionary lacks %q", a)
 		}
+	}
+}
+
+func TestReapStaleDaemon(t *testing.T) {
+	dir := t.TempDir()
+	cmd := exec.Command("sleep", "60")
+	if err := cmd.Start(); err != nil {
+		t.Skip("no sleep")
+	}
+	go cmd.Wait()
+	pf := filepath.Join(dir, "d.pid")
+	os.WriteFile(pf, []byte(fmt.Sprint(cmd.Process.Pid)), 0o600)
+	d := &procDaemon{name: "t", pidFile: pf, match: "sleep", hash: "new"}
+	// unknown hash + adoptUnknown: left running
+	d.adoptUnknown = true
+	d.reapStale()
+	if d.pid() == 0 {
+		t.Fatal("adoptUnknown daemon was killed")
+	}
+	// recorded hash differs: restarted (killed here, the supervisor starts it again)
+	os.WriteFile(pf+".hash", []byte("old"), 0o600)
+	d.reapStale()
+	if d.pid() != 0 {
+		t.Fatal("stale daemon still running")
 	}
 }
