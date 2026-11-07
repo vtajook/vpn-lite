@@ -60,7 +60,7 @@ func pppOptions(in *Inbound, radConf string) string {
 	w("mtu %d", mtu)
 	w("mru %d", mtu)
 	w("nodefaultroute")
-	w("lcp-echo-interval 20")
+	w("lcp-echo-interval 6")
 	w("lcp-echo-failure 3")
 	w("connect-delay 5000")
 	w("plugin radius.so")

@@ -137,8 +137,8 @@ func ovpnServerConfig(in *Inbound, proto, dir, runDir string) string {
 	w("auth SHA256")
 	w("management %s/ovpn-%d-%s.sock unix", runDir, in.ID, proto)
 	w("management-client-auth")
-	w("keepalive 10 60")
-	w("sndbuf 524288") // bigger socket buffers keep a fast (1 Gbit) path from dropping bursts
+	w("keepalive 5 20") // a vanished client is noticed (and its slot freed) after ~20 s
+	w("sndbuf 524288")  // bigger socket buffers keep a fast (1 Gbit) path from dropping bursts
 	w("rcvbuf 524288")
 	if proto == "tcp" {
 		w("tcp-nodelay")
