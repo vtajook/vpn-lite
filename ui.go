@@ -81,6 +81,8 @@ func (a *API) uiRoutes(mux *http.ServeMux) {
 	u("GET", "/certStatus/{id}", a.uiCertStatus)
 	u("GET", "/backup", a.uiBackup)
 	u("POST", "/resetTotal", a.uiResetTotal)
+	u("POST", "/inboundEnable/{id}", a.uiInboundEnable)
+	u("POST", "/inboundReset/{id}", a.uiInboundReset)
 	u("POST", "/deleteExpired", a.uiDeleteExpired)
 	u("GET", "/updateCheck", a.uiUpdateCheck)
 	u("POST", "/update", a.uiUpdate)
@@ -204,7 +206,7 @@ func (a *API) uiAccounts(w http.ResponseWriter, r *http.Request) {
 func (a *API) uiSummary(w http.ResponseWriter, r *http.Request) {
 	now := nowMs()
 	cnt := map[string]int{}
-	var used int64
+	var used, totUp, totDown int64
 	a.st.mu.RLock()
 	for _, acc := range a.st.st.Accounts {
 		cnt[statusOf(acc, now)]++
@@ -219,14 +221,28 @@ func (a *API) uiSummary(w http.ResponseWriter, r *http.Request) {
 		Online   int    `json:"online"`
 		Domain   string `json:"domain"`
 		PSK      string `json:"psk,omitempty"`
+		Up       int64  `json:"up"`
+		Down     int64  `json:"down"`
+		Expired  int    `json:"expired"`
+		Healthy  int    `json:"healthy"`
 	}
 	ins := []inb{}
 	for _, in := range a.st.sortedInbounds() {
-		ins = append(ins, inb{ID: in.ID, Remark: in.Remark, Protocol: in.Protocol, Port: in.Port, Enable: in.Enable,
-			Members: len(a.st.membersLocked(in.ID)), Domain: strings.TrimSpace(strSetting(in.Settings, "connDomain", "")), PSK: l2tpPSK(in)})
+		row := inb{ID: in.ID, Remark: in.Remark, Protocol: in.Protocol, Port: in.Port, Enable: in.Enable, Up: in.Up, Down: in.Down,
+			Domain: strings.TrimSpace(strSetting(in.Settings, "connDomain", "")), PSK: l2tpPSK(in)}
+		for _, m := range a.st.membersLocked(in.ID) {
+			row.Members++
+			switch statusOf(m, now) {
+			case "expired":
+				row.Expired++
+			case "active":
+				row.Healthy++
+			}
+		}
+		ins = append(ins, row)
 	}
 	n := len(a.st.st.Accounts)
-	used = a.st.st.Global.TotalUsed
+	used, totUp, totDown = a.st.st.Global.TotalUsed, a.st.st.Global.TotalUp, a.st.st.Global.TotalDown
 	a.st.mu.RUnlock()
 	byIn := map[int]int{}
 	sess := Sessions.Snapshot()
@@ -238,7 +254,7 @@ func (a *API) uiSummary(w http.ResponseWriter, r *http.Request) {
 	for i := range ins {
 		ins[i].Online = byIn[ins[i].ID]
 	}
-	ok(w, "", map[string]any{"accounts": n, "status": cnt, "usedBytes": used, "sessions": len(sess),
+	ok(w, "", map[string]any{"accounts": n, "status": cnt, "usedBytes": used, "totalUp": totUp, "totalDown": totDown, "sessions": len(sess),
 		"onlineUsers": len(users), "inbounds": ins, "sys": readSys()})
 }
 
@@ -677,7 +693,9 @@ func (a *API) uiRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in State
-	if isSQLite(body) { // the .db backup of the old vpn-ui panel
+	fromDB := false
+	if isSQLite(body) {
+		fromDB = true // the .db backup of the old vpn-ui panel
 		st, _, err := stateFromVpnUiDB(body)
 		if err != nil {
 			fail(w, err.Error())
@@ -710,8 +728,11 @@ func (a *API) uiRestore(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.st.st.Inbounds, a.st.st.Accounts, a.st.st.NextInbound = in.Inbounds, in.Accounts, next
-	if in.Global.TotalUsed > a.st.st.Global.TotalUsed { // never lower the lifetime usage
-		a.st.st.Global.TotalUsed = in.Global.TotalUsed
+	if fromDB { // the old panel's own totals are the baseline
+		a.st.st.Global.TotalUsed, a.st.st.Global.TotalUp, a.st.st.Global.TotalDown = in.Global.TotalUsed, in.Global.TotalUp, in.Global.TotalDown
+	} else { // never lower the lifetime usage
+		g := &a.st.st.Global
+		g.TotalUsed, g.TotalUp, g.TotalDown = max(g.TotalUsed, in.Global.TotalUsed), max(g.TotalUp, in.Global.TotalUp), max(g.TotalDown, in.Global.TotalDown)
 	}
 	a.st.rebaseTotalLocked()
 	g := &a.st.st.Global
@@ -794,7 +815,7 @@ func (a *API) uiBackupNow(w http.ResponseWriter, r *http.Request) {
 // uiResetTotal sets the server-wide lifetime usage counter back to zero (accounts keep their own usage).
 func (a *API) uiResetTotal(w http.ResponseWriter, r *http.Request) {
 	a.st.mu.Lock()
-	a.st.st.Global.TotalUsed = 0
+	a.st.st.Global.TotalUsed, a.st.st.Global.TotalUp, a.st.st.Global.TotalDown = 0, 0, 0
 	a.st.st.Global.TotalInit = true
 	a.st.touch()
 	a.st.mu.Unlock()
@@ -834,4 +855,44 @@ func (a *API) uiDeleteExpired(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ok(w, "", len(kick))
+}
+
+// uiInboundEnable switches one service on or off (the daemon follows within a second).
+func (a *API) uiInboundEnable(w http.ResponseWriter, r *http.Request) {
+	id := pathID(r)
+	on := r.Form.Get("enable") == "1" || r.Form.Get("enable") == "true"
+	a.st.mu.Lock()
+	in := a.st.st.Inbounds[id]
+	if in == nil {
+		a.st.mu.Unlock()
+		fail(w, "Inbound not found")
+		return
+	}
+	if on && !in.Enable {
+		if msg := a.st.portClashLocked(&Inbound{ID: in.ID, Enable: true, Port: in.Port, Protocol: in.Protocol, Listen: in.Listen, Settings: in.Settings}); msg != "" {
+			a.st.mu.Unlock()
+			fail(w, msg)
+			return
+		}
+	}
+	in.Enable = on
+	a.st.touch()
+	a.st.mu.Unlock()
+	a.d.ReloadInbound(id)
+	ok(w, "saved", nil)
+}
+
+// uiInboundReset zeroes the traffic counters shown for one service.
+func (a *API) uiInboundReset(w http.ResponseWriter, r *http.Request) {
+	a.st.mu.Lock()
+	in := a.st.st.Inbounds[pathID(r)]
+	if in == nil {
+		a.st.mu.Unlock()
+		fail(w, "Inbound not found")
+		return
+	}
+	in.Up, in.Down = 0, 0
+	a.st.touch()
+	a.st.mu.Unlock()
+	ok(w, "saved", nil)
 }

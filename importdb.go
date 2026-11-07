@@ -77,7 +77,7 @@ func stateFromVpnUiDB(data []byte) (*State, int, error) {
 		id := int(asInt(g(ti, r, "id")))
 		in := &Inbound{ID: id, Remark: asStr(g(ti, r, "remark")), Enable: asInt(g(ti, r, "enable")) != 0,
 			Listen: asStr(g(ti, r, "listen")), Port: int(asInt(g(ti, r, "port"))), Protocol: proto, Settings: set,
-			SortOrder: int(asInt(g(ti, r, "sort_order")))}
+			SortOrder: int(asInt(g(ti, r, "sort_order"))), Up: asInt(g(ti, r, "up")), Down: asInt(g(ti, r, "down"))}
 		st.Inbounds[id] = in
 		if id >= st.NextInbound {
 			st.NextInbound = id + 1
@@ -150,5 +150,12 @@ func stateFromVpnUiDB(data []byte) (*State, int, error) {
 	for _, a := range st.Accounts {
 		sort.Ints(a.Inbounds)
 	}
+	// the old panel's headline numbers are the sums of its services' counters
+	for _, in := range st.Inbounds {
+		st.Global.TotalUp += in.Up
+		st.Global.TotalDown += in.Down
+	}
+	st.Global.TotalUsed = st.Global.TotalUp + st.Global.TotalDown
+	st.Global.TotalInit = true
 	return st, skipped, nil
 }

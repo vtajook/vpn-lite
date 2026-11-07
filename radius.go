@@ -385,12 +385,16 @@ func (r *RadiusServer) handleAcct(from *net.UDPAddr, p *radPkt) []byte {
 			Shaper.Apply(s)
 		}
 		dUp, dDown, s := Sessions.Touch(sid, in, out)
+		if s != nil {
+			r.st.addInboundBytes(s.InboundID, dUp, dDown)
+		}
 		if s != nil && r.st.AddTraffic(s.Email, dUp, dDown) {
 			Sessions.KickEmail(s.Email)
 		}
 	case 2: // stop
 		dUp, dDown, s := Sessions.Touch(sid, in, out)
 		if s != nil {
+			r.st.addInboundBytes(s.InboundID, dUp, dDown)
 			r.st.AddTraffic(s.Email, dUp, dDown)
 			Sessions.Remove(sid)
 			Events.Add("disconnect", proto, s.Email, "cause=%d up=%d down=%d", p.u32(49), in, out)

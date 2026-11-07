@@ -716,6 +716,11 @@ func TestVpnUiDBBackup(t *testing.T) {
 	if st.Inbounds[5].Settings["caCert"] != "CA" || st.Inbounds[5].Settings["tlsCrypt"] != "TC" {
 		t.Fatalf("ovpn settings: %v", st.Inbounds[5].Settings)
 	}
+	// the old panel's headline totals are the sums of its services' counters
+	if st.Inbounds[5].Up != 2000000000 || st.Inbounds[5].Down != 5000000000 || st.Global.TotalUsed != 11000000000 ||
+		st.Global.TotalUp != 3000000000 || st.Global.TotalDown != 8000000000 {
+		t.Fatalf("totals: %+v %+v", st.Inbounds[5], st.Global)
+	}
 	if len(st.Accounts) != 400 {
 		t.Fatalf("accounts %d", len(st.Accounts))
 	}
@@ -884,5 +889,21 @@ func TestOvpnServerAcceptsOldProfiles(t *testing.T) {
 				t.Fatalf("%s config lacks %q:\n%s", p, want, c)
 			}
 		}
+	}
+}
+
+func TestServiceTrafficCounters(t *testing.T) {
+	st := testStore(t)
+	seed(st)
+	st.addInboundBytes(1, 100, 900)
+	st.addInboundBytes(2, 10, 20)
+	st.addInboundBytes(1, 5, 5)
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if in := st.st.Inbounds[1]; in.Up != 105 || in.Down != 905 {
+		t.Fatalf("service 1: %d/%d", in.Up, in.Down)
+	}
+	if g := st.st.Global; g.TotalUp != 115 || g.TotalDown != 925 {
+		t.Fatalf("totals %d/%d", g.TotalUp, g.TotalDown)
 	}
 }

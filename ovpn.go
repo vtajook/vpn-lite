@@ -328,6 +328,9 @@ func (i *ovpnInst) readLoop(conn net.Conn) {
 
 func (i *ovpnInst) account(sid string, up, down int64) {
 	dUp, dDown, s := Sessions.Touch(sid, up, down)
+	if s != nil {
+		i.m.st.addInboundBytes(s.InboundID, dUp, dDown)
+	}
 	if s != nil && i.m.st.AddTraffic(s.Email, dUp, dDown) {
 		Sessions.KickEmail(s.Email)
 	}

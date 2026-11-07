@@ -26,6 +26,9 @@ type Inbound struct {
 	Total      int64          `json:"total"`
 	ExpiryTime int64          `json:"expiryTime"`
 	SortOrder  int            `json:"sortOrder"`
+	// Lifetime traffic carried by this service (client->server, server->client).
+	Up   int64 `json:"up"`
+	Down int64 `json:"down"`
 }
 
 // Account is one sellable identity. It may be a member of several inbounds.
@@ -102,6 +105,8 @@ type GlobalSettings struct {
 	// TotalUsed is the lifetime traffic of the whole server. It only ever grows: deleting an
 	// account or resetting its volume never lowers it.
 	TotalUsed int64 `json:"totalUsed"`
+	TotalUp   int64 `json:"totalUp"`   // lifetime bytes received from clients, all services
+	TotalDown int64 `json:"totalDown"` // lifetime bytes sent to clients
 	TotalInit bool  `json:"totalInit"` // the counter was seeded once; a manual reset must not be undone at restart
 }
 
@@ -265,15 +270,50 @@ func delInt(a []int, v int) []int {
 	return out
 }
 
-// rebaseTotalLocked makes sure the lifetime counter is never below what the accounts in the
-// state have already used (first start after an upgrade, restore, import).
+// rebaseTotalLocked makes sure the lifetime counters are never below what the services (or,
+// for an old state without per-service counters, the accounts) already carried.
 func (s *Store) rebaseTotalLocked() {
-	var sum int64
-	for _, a := range s.st.Accounts {
-		sum += a.AllTime
+	var sum, up, down int64
+	for _, in := range s.st.Inbounds {
+		up += in.Up
+		down += in.Down
 	}
-	if sum > s.st.Global.TotalUsed {
-		s.st.Global.TotalUsed = sum
+	sum = up + down
+	if sum == 0 {
+		for _, a := range s.st.Accounts {
+			sum += a.AllTime
+		}
+	}
+	g := &s.st.Global
+	if sum > g.TotalUsed {
+		g.TotalUsed = sum
 		s.dirty = true
 	}
+	if up > g.TotalUp {
+		g.TotalUp = up
+		s.dirty = true
+	}
+	if down > g.TotalDown {
+		g.TotalDown = down
+		s.dirty = true
+	}
+}
+
+// addInboundBytes books traffic on the service that carried it and on the lifetime totals.
+func (s *Store) addInboundBytes(inbound int, up, down int64) {
+	if up < 0 {
+		up = 0
+	}
+	if down < 0 {
+		down = 0
+	}
+	s.mu.Lock()
+	if in := s.st.Inbounds[inbound]; in != nil {
+		in.Up += up
+		in.Down += down
+	}
+	s.st.Global.TotalUp += up
+	s.st.Global.TotalDown += down
+	s.touch()
+	s.mu.Unlock()
 }
