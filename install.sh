@@ -242,7 +242,7 @@ do_install() { # full wizard; on an existing install it is a clean rewrite that 
     say "clean reinstall (accounts and services are kept)"
     wipe_runtime
     cp -f "$STATE" "$STATE.pre-reinstall" 2>/dev/null || true
-    rm -rf /etc/vpn-lite /run/vpn-lite /etc/swanctl/conf.d/vpn-lite.conf /etc/strongswan.d/vpn-lite.conf /etc/systemd/system/vpn-lite.service /etc/sysctl.d/99-vpn-lite.conf /etc/modules-load.d/vpn-lite.conf
+    rm -rf /etc/vpn-lite /run/vpn-lite /etc/swanctl/conf.d/vpn-lite.conf /etc/systemd/system/vpn-lite.service /etc/sysctl.d/99-vpn-lite.conf /etc/modules-load.d/vpn-lite.conf
   fi
   [ "$DEPS" = 1 ] && install_deps "$clean"
   fetch_binary
@@ -371,7 +371,7 @@ do_uninstall() { # do_uninstall purge(0|1)
   say "stopping panel and its VPN daemons"
   systemctl disable --now vpn-lite 2>/dev/null || true
   wipe_runtime
-  rm -f /etc/systemd/system/vpn-lite.service "$BIN" /etc/swanctl/conf.d/vpn-lite.conf /etc/strongswan.d/vpn-lite.conf /etc/sysctl.d/99-vpn-lite.conf /etc/modules-load.d/vpn-lite.conf
+  rm -f /etc/systemd/system/vpn-lite.service "$BIN" /etc/swanctl/conf.d/vpn-lite.conf /etc/sysctl.d/99-vpn-lite.conf /etc/modules-load.d/vpn-lite.conf
   systemctl daemon-reload
   if [ "$1" = 1 ]; then
     rm -rf "$DATA" /etc/vpn-lite /var/log/vpn-lite /run/vpn-lite "$MENU_BIN"
