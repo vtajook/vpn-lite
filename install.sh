@@ -118,6 +118,8 @@ host_tuning() {
   cat > /etc/sysctl.d/99-vpn-lite.conf <<'SYS'
 net.ipv4.ip_forward = 1
 net.netfilter.nf_conntrack_max = 1048576
+net.core.rmem_max = 4194304
+net.core.wmem_max = 4194304
 SYS
   sysctl -q -p /etc/sysctl.d/99-vpn-lite.conf 2>/dev/null || true
 }

@@ -138,6 +138,11 @@ func ovpnServerConfig(in *Inbound, proto, dir, runDir string) string {
 	w("management %s/ovpn-%d-%s.sock unix", runDir, in.ID, proto)
 	w("management-client-auth")
 	w("keepalive 10 60")
+	w("sndbuf 524288") // bigger socket buffers keep a fast (1 Gbit) path from dropping bursts
+	w("rcvbuf 524288")
+	if proto == "tcp" {
+		w("tcp-nodelay")
+	}
 	w("persist-key")
 	w("persist-tun")
 	if proto == "udp" {
