@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"net/netip"
+	"sort"
 	"strings"
 	"sync/atomic"
 )
@@ -30,10 +31,26 @@ func iranPrefixes() []netip.Prefix {
 	return out
 }
 
+// ciscoIranRoutes: Cisco/AnyConnect clients cope badly with thousands of split-exclude
+// entries, so Cisco gets only the largest ranges (about 91% of Iranian addresses).
+const ciscoIranRoutes = 400
+
+// iranLargest returns the n biggest ranges (all of them when n <= 0), in address order.
+func iranLargest(n int) []netip.Prefix {
+	all := iranPrefixes()
+	if n <= 0 || n >= len(all) {
+		return all
+	}
+	sort.SliceStable(all, func(i, j int) bool { return all[i].Bits() < all[j].Bits() })
+	all = all[:n]
+	sort.Slice(all, func(i, j int) bool { return all[i].Addr().Less(all[j].Addr()) })
+	return all
+}
+
 // iranRouteLines renders one line per range using the given format ("%s %s" = address, netmask).
-func iranRouteLines(format string) []string {
+func iranRouteLines(format string, max int) []string {
 	var out []string
-	for _, p := range iranPrefixes() {
+	for _, p := range iranLargest(max) {
 		out = append(out, fmt.Sprintf(format, p.Addr(), prefixMask(p.Bits())))
 	}
 	return out

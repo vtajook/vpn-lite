@@ -951,6 +951,12 @@ func TestIranDirectRoutes(t *testing.T) {
 	if !strings.Contains(ocOn, "no-route = 2.144.0.0/255.252.0.0") || !strings.Contains(ocOn, "route = default") {
 		t.Fatal("ocserv: Iran routes missing or default route lost")
 	}
+	if n := strings.Count(ocOn, "no-route"); n != ciscoIranRoutes {
+		t.Fatalf("cisco should get %d routes, got %d", ciscoIranRoutes, n)
+	}
+	if n := strings.Count(ovOn, "net_gateway"); n < 1000 {
+		t.Fatalf("openvpn should get the full list, got %d", n)
+	}
 	if ovOn == ovOff || ocOn == ocOff {
 		t.Fatal("config must change so the daemon restarts")
 	}

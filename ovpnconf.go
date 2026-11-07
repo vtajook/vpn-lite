@@ -115,7 +115,7 @@ func ovpnServerConfig(in *Inbound, proto, dir, runDir string) string {
 	w("verify-client-cert none")
 	w(`push "redirect-gateway def1 bypass-dhcp"`)
 	if iranDirectOn.Load() { // Iranian addresses bypass the tunnel
-		for _, r := range iranRouteLines(`push "route %s %s net_gateway"`) {
+		for _, r := range iranRouteLines(`push "route %s %s net_gateway"`, 0) {
 			w("%s", r)
 		}
 	}
