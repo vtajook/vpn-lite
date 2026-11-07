@@ -232,7 +232,10 @@ func (a *API) uiSummary(w http.ResponseWriter, r *http.Request) {
 	for _, in := range a.st.sortedInbounds() {
 		row := inb{ID: in.ID, Remark: in.Remark, Protocol: in.Protocol, Port: in.Port, Enable: in.Enable, Up: in.Up, Down: in.Down,
 			Domain: strings.TrimSpace(strSetting(in.Settings, "connDomain", "")), PSK: l2tpPSK(in)}
-		for _, m := range a.st.membersLocked(in.ID) {
+		for _, m := range a.st.st.Accounts { // counted in place: no per-poll copy or sort of every account
+			if !hasInt(m.Inbounds, in.ID) {
+				continue
+			}
 			row.Members++
 			switch statusOf(m, now) {
 			case "expired":
@@ -755,6 +758,7 @@ func (a *API) uiRestore(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.st.st.Inbounds, a.st.st.Accounts, a.st.st.NextInbound = in.Inbounds, in.Accounts, next
+	a.st.normalizeKeysLocked()
 	if fromDB { // the old panel's own totals are the baseline
 		a.st.st.Global.TotalUsed, a.st.st.Global.TotalUp, a.st.st.Global.TotalDown = in.Global.TotalUsed, in.Global.TotalUp, in.Global.TotalDown
 	} else { // never lower the lifetime usage

@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/netip"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ func NewEngine(st *Store, confDir, runDir, logDir string) *Engine {
 	e := &Engine{st: st, conf: confDir, run: runDir, l2tp: newDaemonSet(), oc: newDaemonSet(),
 		trigger: make(chan struct{}, 1), stop: make(chan struct{})}
 	e.ovpn = NewOvpnManager(st, filepath.Join(confDir, "ovpn"), runDir, logDir)
+	writeLogrotate(logDir)
 	e.rad = &RadiusServer{st: st, secret: st.st.RadiusKey}
 	e.rad.kill = func(proto string, s *Session) {
 		switch proto {
@@ -61,7 +63,9 @@ func (e *Engine) ReloadInbound(int) {
 	}
 }
 
-func (e *Engine) Kick(email string) { Sessions.KickEmail(email) }
+func (e *Engine) Kick(email string) {
+	Sessions.KickEmailWhy(email, "account changed by the panel or the bot (deleted, disabled or password changed)")
+}
 
 func (e *Engine) Online() map[string]int64 {
 	m := map[string]int64{}
@@ -116,6 +120,25 @@ func (e *Engine) Reconcile() {
 	if err := applyNft(e.pools()); err != nil {
 		Events.Add("error", "nft", "", "%v", err)
 	}
+}
+
+// writeLogrotate keeps the OpenVPN logs (written by the daemons themselves) from growing without
+// limit. copytruncate: the daemons keep their file open and are never restarted for it.
+func writeLogrotate(logDir string) {
+	if _, err := os.Stat("/etc/logrotate.d"); err != nil {
+		return
+	}
+	writeIfChanged("/etc/logrotate.d/vpn-lite", logDir+`/openvpn-*.log {
+	daily
+	rotate 5
+	maxsize 50M
+	missingok
+	notifempty
+	compress
+	delaycompress
+	copytruncate
+}
+`, 0o644)
 }
 
 // housekeeping: stale-session sweep and periodic traffic resets.

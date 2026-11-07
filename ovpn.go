@@ -267,11 +267,17 @@ func (i *ovpnInst) attach() {
 	i.readLoop(conn)
 }
 
+// send writes one management command. A daemon that stops reading must not freeze the panel:
+// after 5 s the write fails, the connection is dropped and re-attached.
 func (i *ovpnInst) send(format string, a ...any) {
 	i.wmu.Lock()
 	defer i.wmu.Unlock()
-	if i.conn != nil {
-		fmt.Fprintf(i.conn, format+"\n", a...)
+	if i.conn == nil {
+		return
+	}
+	i.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	if _, err := fmt.Fprintf(i.conn, format+"\n", a...); err != nil {
+		i.conn.Close()
 	}
 }
 
@@ -332,7 +338,7 @@ func (i *ovpnInst) account(sid string, up, down int64) {
 		i.m.st.addInboundBytes(s.InboundID, dUp, dDown)
 	}
 	if s != nil && i.m.st.AddTraffic(s.Email, dUp, dDown) {
-		Sessions.KickEmail(s.Email)
+		Sessions.KickEmailWhy(s.Email, "quota exhausted")
 	}
 }
 
@@ -347,7 +353,7 @@ func (i *ovpnInst) dispatch(evt, cid, kid string, env map[string]string) {
 			res, _ := i.m.st.checkAccount(i.id, user, verify)
 			ok, reason = res.Reason == "", res.Reason
 		} else {
-			sess := &Session{ID: sid, InboundID: i.id, Proto: "openvpn-" + i.proto, SrcIP: env["untrusted_ip"]}
+			sess := &Session{ID: sid, InboundID: i.id, Proto: "openvpn-" + i.proto, SrcIP: env["untrusted_ip"], User: user}
 			sess.Kill = func() { i.send("client-kill %s", cid) }
 			res := i.m.st.AuthorizeFn(i.id, user, verify, sess)
 			ok, reason = res.OK, res.Reason
@@ -412,8 +418,8 @@ func (i *ovpnInst) adopt(f []string, listed map[string]bool) {
 	if h, _, err := net.SplitHostPort(src); err == nil {
 		src = h
 	}
-	s := &Session{ID: sid, Email: email, InboundID: i.id, Proto: "openvpn-" + i.proto, SrcIP: src,
-		VIP: f[3], Dev: fmt.Sprintf("vl%d%s", i.id, i.proto[:1]), Start: since * 1000, LastSeen: nowMs(), Up: up, Down: down}
+	s := &Session{ID: sid, Email: email, User: user, InboundID: i.id, Proto: "openvpn-" + i.proto, SrcIP: src,
+		VIP: f[3], Dev: fmt.Sprintf("vl%d%s", i.id, i.proto[:1]), Start: since * 1000, LastSeen: nowMs(), LastActive: nowMs(), Up: up, Down: down}
 	s.Kill = func() { i.send("client-kill %s", cid) }
 	Sessions.Add(s)
 }

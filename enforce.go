@@ -19,11 +19,31 @@ type Session struct {
 	VIP       string // tunnel address handed to the client
 	Dev       string // network device carrying it (resolved lazily)
 
-	Start    int64  // unix ms
-	Kill     func() // engine-specific disconnect; must not block on the caller's locks
-	Up, Down int64  // last absolute counters seen (client->server, server->client)
-	LastSeen int64  // unix ms of the last event for this session
-	dying    bool   // evicted/kicked: no longer counts toward the cap, removed on its Stop event
+	User string // VPN login name (the daemons know the session by it, not by the email)
+
+	Start      int64  // unix ms
+	Kill       func() // engine-specific disconnect; must not block on the caller's locks
+	Up, Down   int64  // last absolute counters seen (client->server, server->client)
+	LastSeen   int64  // unix ms of the last event for this session
+	LastActive int64  // unix ms of the last report in which the client had sent anything
+	dying      bool   // evicted/kicked: no longer counts toward the cap, removed on its Stop event
+}
+
+// deadAfterMs: a session whose client has sent nothing for this long is a connection the daemon
+// has not noticed is gone yet (phone changed network, app was killed). OpenVPN clients send a
+// keepalive every 5 s and the counters arrive every 10 s; L2TP and Cisco counters arrive once
+// a minute.
+func deadAfterMs(proto string) int64 {
+	if protoFamily(proto) == "openvpn" {
+		return 30_000
+	}
+	return 150_000
+}
+
+func (s *Session) looksDead(now int64) bool {
+	// LastActive is set when a session is created and on every report with client traffic;
+	// a session without it has no activity data at all and is never judged dead
+	return s.LastActive > 0 && now-s.LastActive > deadAfterMs(s.Proto)
 }
 
 type SessionTable struct {
@@ -76,6 +96,15 @@ func (t *SessionTable) Snapshot() []Session {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Start > out[j].Start })
 	return out
+}
+
+// KickEmailWhy drops every live session of an account and records why.
+func (t *SessionTable) KickEmailWhy(email, why string) int {
+	n := t.KickEmail(email)
+	if n > 0 {
+		Events.Add("kick", "", email, "%s (%d sessions)", why, n)
+	}
+	return n
 }
 
 func (t *SessionTable) KickEmail(email string) int {
@@ -205,12 +234,23 @@ func (s *Store) AuthorizeFn(inboundID int, user string, verify func(stored strin
 		}
 		return ""
 	}
-	same := live
+	// A reconnecting client usually arrives before the daemon has noticed that its previous
+	// connection is gone. Such a dead session never blocks the login: it is replaced.
+	var dead []*Session
+	alive := live[:0:0]
+	for _, s := range live {
+		if s.looksDead(now) {
+			dead = append(dead, s)
+		} else {
+			alive = append(alive, s)
+		}
+	}
+	same := alive
 	if res.Single || !g.AllowMultiProto {
 		// one protocol at a time: while the account is connected on another protocol, the
 		// new protocol is refused outright (the running connection is never disturbed)
 		same = nil
-		for _, s := range live {
+		for _, s := range alive {
 			if protoFamily(s.Proto) == res.Family {
 				same = append(same, s)
 			} else {
@@ -228,16 +268,37 @@ func (s *Store) AuthorizeFn(inboundID int, user string, verify func(stored strin
 			evict = append(evict, same[i])
 		}
 	}
+	// dead sessions only need replacing when they would otherwise block this login
+	needDead := len(live) >= limit
+	if res.Single || !g.AllowMultiProto {
+		for _, d := range dead {
+			if protoFamily(d.Proto) != res.Family {
+				needDead = true
+			}
+		}
+	}
+	if needDead && len(dead) > 0 {
+		evict = append(evict, dead...)
+	} else {
+		dead = nil
+	}
 	for _, e := range evict {
 		e.dying = true
 	}
 	if sess != nil {
 		sess.Email = email
-		sess.Start, sess.LastSeen = now, now
+		sess.Start, sess.LastSeen, sess.LastActive = now, now, now
 		Sessions.byID[sess.ID] = sess
 	}
 	Sessions.mu.Unlock()
 	for _, e := range evict {
+		why := "replaced by a newer login (device limit)"
+		for _, d := range dead {
+			if d == e {
+				why = "replaced by a new login: the old connection had stopped sending"
+			}
+		}
+		Events.Add("evict", e.Proto, email, "%s", why)
 		if e.Kill != nil {
 			go e.Kill()
 		}
@@ -266,7 +327,7 @@ func (s *Store) AddTraffic(email string, up, down int64) (depleted bool) {
 	acc.Down += down
 	acc.AllTime += up + down
 	acc.LastOnline = nowMs()
-	s.touch()
+	s.touchTraffic()
 	return acc.overQuota()
 }
 
@@ -297,10 +358,20 @@ func (s *Store) enforceOnce() {
 		seen[sn.Email] = true
 		s.mu.RLock()
 		acc := s.st.Accounts[ekey(sn.Email)]
-		dead := acc == nil || !acc.Enable || acc.expired(now) || acc.overQuota()
+		why := ""
+		switch {
+		case acc == nil:
+			why = "account deleted"
+		case !acc.Enable:
+			why = "account disabled"
+		case acc.expired(now):
+			why = "account expired"
+		case acc.overQuota():
+			why = "quota exhausted"
+		}
 		s.mu.RUnlock()
-		if dead {
-			Sessions.KickEmail(sn.Email)
+		if why != "" {
+			Sessions.KickEmailWhy(sn.Email, why)
 		}
 	}
 }
@@ -336,6 +407,9 @@ func (t *SessionTable) Touch(id string, up, down int64) (dUp, dDown int64, s *Se
 		dDown = down
 	}
 	s.Up, s.Down, s.LastSeen = up, down, nowMs()
+	if dUp > 0 {
+		s.LastActive = s.LastSeen
+	}
 	return dUp, dDown, s
 }
 

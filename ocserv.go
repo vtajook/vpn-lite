@@ -79,8 +79,8 @@ func ocservConf(in *Inbound, dir, run, radConf string) string {
 	return b.String()
 }
 
-func (e *Engine) ocservDaemons(dir, run, secret string) map[string]*procDaemon {
-	out := map[string]*procDaemon{}
+func (e *Engine) ocservDaemons(dir, run, secret string) (out map[string]*procDaemon, keep map[string]bool) {
+	out, keep = map[string]*procDaemon{}, map[string]bool{}
 	e.st.mu.RLock()
 	var ins []*Inbound
 	for _, in := range e.st.st.Inbounds {
@@ -92,14 +92,21 @@ func (e *Engine) ocservDaemons(dir, run, secret string) map[string]*procDaemon {
 	e.st.mu.RUnlock()
 	bin, _ := exec.LookPath("ocserv")
 	if bin == "" {
+		bin = "/usr/sbin/ocserv"
+	}
+	if _, err := os.Stat(bin); err != nil {
+		for _, in := range ins {
+			keep[fmt.Sprint(in.ID)] = true
+		}
 		if len(ins) > 0 {
 			Events.Add("error", "openconnect", "", "ocserv is not installed")
 		}
-		return out
+		return
 	}
 	for _, in := range ins {
 		cert, key := e.ocCertificate(in)
 		if cert == "" || key == "" {
+			keep[fmt.Sprint(in.ID)] = true
 			Events.Add("error", "openconnect", "", "inbound %d: could not prepare a TLS certificate; not started", in.ID)
 			continue
 		}
@@ -109,6 +116,7 @@ func (e *Engine) ocservDaemons(dir, run, secret string) map[string]*procDaemon {
 		writeIfChanged(filepath.Join(d, "server.key"), key+"\n", 0o600)
 		radConf, err := writeRadiusClient(filepath.Join(d, "radius"), secret, "vl-oc", true)
 		if err != nil {
+			keep[fmt.Sprint(in.ID)] = true
 			continue
 		}
 		body := ocservConf(in, d, run, radConf)
@@ -119,7 +127,7 @@ func (e *Engine) ocservDaemons(dir, run, secret string) map[string]*procDaemon {
 			pidFile: filepath.Join(run, fmt.Sprintf("ocserv-%d.pid", in.ID)), match: "ocserv",
 			hash: fingerprint(body, cert, key, secret, radDictionary)}
 	}
-	return out
+	return
 }
 
 // killOcserv disconnects exactly one session. occtl identifies sessions by an internal
@@ -128,7 +136,11 @@ func (e *Engine) ocservDaemons(dir, run, secret string) map[string]*procDaemon {
 func killOcserv(run string, s *Session) {
 	sock := filepath.Join(run, fmt.Sprintf("occtl-%d.sock", s.InboundID))
 	if s.VIP == "" { // no tunnel address known: drop by user name
-		exec.Command("occtl", "-s", sock, "disconnect", "user", s.Email).Run()
+		user := s.User
+		if user == "" {
+			user = s.Email
+		}
+		exec.Command("occtl", "-s", sock, "disconnect", "user", user).Run()
 		return
 	}
 	out, err := exec.Command("occtl", "-s", sock, "-j", "show", "users").Output()

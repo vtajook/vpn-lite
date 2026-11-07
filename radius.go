@@ -368,7 +368,6 @@ func (r *RadiusServer) handleAcct(from *net.UDPAddr, p *radPkt) []byte {
 	if p.Code != radAccountingReq {
 		return nil
 	}
-	defer func() {}()
 	resp := (&radPkt{Code: radAccountingResp, ID: p.ID}).encode(r.secret, p.Auth)
 	key := fmt.Sprintf("%s/%d/%x", from.IP, p.ID, p.Auth)
 	r.mu.Lock()
@@ -395,9 +394,14 @@ func (r *RadiusServer) handleAcct(from *net.UDPAddr, p *radPkt) []byte {
 			if acc == nil {
 				return resp
 			}
-			s := &Session{ID: sid, Email: acc.Email, InboundID: inbound, Proto: proto,
-				SrcIP: p.str(attrCallingStation), VIP: vip, Start: nowMs(), LastSeen: nowMs(),
-				Up: 0, Down: 0}
+			now := nowMs()
+			s := &Session{ID: sid, Email: acc.Email, User: acc.Username, InboundID: inbound, Proto: proto,
+				SrcIP: p.str(attrCallingStation), VIP: vip, Start: now, LastSeen: now, LastActive: now}
+			if status == 3 {
+				// an interim for a session the panel does not know (the panel restarted, or the
+				// session was swept): the traffic up to now was already counted, start from here
+				s.Up, s.Down = in, out
+			}
 			unit := int(p.u32(attrNASPort))
 			s.Kill = func() { r.kill(proto, s) }
 			s.Dev = ""
@@ -405,7 +409,11 @@ func (r *RadiusServer) handleAcct(from *net.UDPAddr, p *radPkt) []byte {
 				s.Dev = "ppp" + strconv.Itoa(unit)
 			}
 			Sessions.Add(s)
-			Events.Add("connect", proto, acc.Email, "ip=%s src=%s", vip, s.SrcIP)
+			if status == 3 {
+				Events.Add("connect", proto, acc.Email, "ip=%s src=%s (already connected: picked up again after a panel restart)", vip, s.SrcIP)
+			} else {
+				Events.Add("connect", proto, acc.Email, "ip=%s src=%s", vip, s.SrcIP)
+			}
 			Shaper.Apply(s)
 		}
 		dUp, dDown, s := Sessions.Touch(sid, in, out)
@@ -413,7 +421,7 @@ func (r *RadiusServer) handleAcct(from *net.UDPAddr, p *radPkt) []byte {
 			r.st.addInboundBytes(s.InboundID, dUp, dDown)
 		}
 		if s != nil && r.st.AddTraffic(s.Email, dUp, dDown) {
-			Sessions.KickEmail(s.Email)
+			Sessions.KickEmailWhy(s.Email, "quota exhausted")
 		}
 	case 2: // stop
 		dUp, dDown, s := Sessions.Touch(sid, in, out)

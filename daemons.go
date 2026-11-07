@@ -21,8 +21,11 @@ type procDaemon struct {
 	bin     string
 	args    []string
 	pidFile string
-	match   string // substring of /proc/<pid>/cmdline identifying our process
-	hash    string // fingerprint of config; a change restarts the daemon
+	// hashFile records the config fingerprint the running daemon was started with (default
+	// pidFile+".hash"); a new name starts a new fingerprint scheme without restarting anything.
+	hashFile string
+	match    string // substring of /proc/<pid>/cmdline identifying our process
+	hash     string // fingerprint of config; a change restarts the daemon
 	// adoptUnknown: a daemon started before hashes were recorded is adopted as it is instead of restarted.
 	adoptUnknown bool
 	stop         chan struct{}
@@ -58,7 +61,7 @@ func (d *procDaemon) reapStale() {
 	if p == 0 {
 		return
 	}
-	hf := d.pidFile + ".hash"
+	hf := d.hashPath()
 	old, err := os.ReadFile(hf)
 	if err != nil && d.adoptUnknown {
 		os.WriteFile(hf, []byte(d.hash), 0o600)
@@ -77,6 +80,13 @@ func (d *procDaemon) reapStale() {
 		time.Sleep(200 * time.Millisecond)
 	}
 	os.Remove(d.pidFile)
+}
+
+func (d *procDaemon) hashPath() string {
+	if d.hashFile != "" {
+		return d.hashFile
+	}
+	return d.pidFile + ".hash"
 }
 
 func (d *procDaemon) run() {
@@ -104,7 +114,7 @@ func (d *procDaemon) run() {
 			}
 			Events.Add("daemon", d.name, "", "started")
 			time.Sleep(500 * time.Millisecond)
-			os.WriteFile(d.pidFile+".hash", []byte(d.hash), 0o600)
+			os.WriteFile(d.hashPath(), []byte(d.hash), 0o600)
 		}
 		backoff = time.Second
 		select {
@@ -130,7 +140,10 @@ type daemonSet struct {
 
 func newDaemonSet() *daemonSet { return &daemonSet{m: map[string]*procDaemon{}} }
 
-func (s *daemonSet) apply(desired map[string]*procDaemon) {
+// apply makes the running set match desired. A key in keep is wanted but could not be rendered
+// this time (a transient error): its running daemon is left alone instead of being stopped,
+// because stopping it would drop every user of that service.
+func (s *daemonSet) apply(desired map[string]*procDaemon, keep map[string]bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for k, want := range desired {
@@ -147,7 +160,7 @@ func (s *daemonSet) apply(desired map[string]*procDaemon) {
 		go want.run()
 	}
 	for k, cur := range s.m {
-		if _, ok := desired[k]; !ok {
+		if _, ok := desired[k]; !ok && !keep[k] {
 			cur.terminate()
 			delete(s.m, k)
 		}

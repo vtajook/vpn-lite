@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -116,7 +117,10 @@ func (s *Store) BackupLoop(stop <-chan struct{}) {
 	}
 }
 
-var tgLastFail time.Time
+var (
+	tgFailMu   sync.Mutex
+	tgLastFail time.Time
+)
 
 // TgNotify sends a short text message to the configured chat (asynchronously; errors are only logged).
 func (s *Store) TgNotify(text string) {
@@ -151,10 +155,15 @@ func (s *Store) NotifyLogin(okLogin bool, user, ip string) {
 		s.TgNotify(fmt.Sprintf("🔐 Panel login\nserver: %s\nuser: %s\nIP: %s\ntime: %s", host, user, ip, now))
 		return
 	}
-	if time.Since(tgLastFail) < time.Minute {
+	tgFailMu.Lock()
+	recent := time.Since(tgLastFail) < time.Minute
+	if !recent {
+		tgLastFail = time.Now()
+	}
+	tgFailMu.Unlock()
+	if recent {
 		return
 	}
-	tgLastFail = time.Now()
 	s.TgNotify(fmt.Sprintf("⚠️ Failed panel login\nserver: %s\nuser tried: %s\nIP: %s\ntime: %s", host, user, ip, now))
 }
 

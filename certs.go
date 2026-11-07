@@ -73,6 +73,13 @@ func cloneSettings(m map[string]any) map[string]any {
 // ensureOvpnCerts creates the CA, server certificate and tls-crypt key of an OpenVPN inbound
 // when it has none. It reports whether certificates exist afterwards.
 func (s *Store) ensureOvpnCerts(id int) bool {
+	s.mu.RLock() // the usual case (certificates exist) must not take the write lock
+	if in := s.st.Inbounds[id]; in != nil && in.Protocol == "openvpn" &&
+		strSetting(in.Settings, "caCert", "") != "" && strSetting(in.Settings, "serverCert", "") != "" {
+		s.mu.RUnlock()
+		return true
+	}
+	s.mu.RUnlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	in := s.st.Inbounds[id]

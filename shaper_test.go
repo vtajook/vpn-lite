@@ -16,6 +16,7 @@ func TestShaperCommands(t *testing.T) {
 	sh.st = st
 	sh.run = func(a ...string) error { mu <- strings.Join(a, " "); return nil }
 	sh.route = func(string) string { return "vl1u" }
+	sh.show = func(...string) string { return "" }
 	sess := &Session{ID: "s", Email: "alice@x", VIP: "10.101.2.5", Proto: "openvpn-udp"}
 	sh.Apply(sess)
 	var got []string

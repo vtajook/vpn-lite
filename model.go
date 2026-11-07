@@ -90,9 +90,29 @@ func (s *Store) membersLocked(id int) []*Account {
 	return out
 }
 
+// inboundView is a copy of everything the old-API object needs, taken under the store lock;
+// render (the expensive JSON work) runs without it. Settings values are never mutated in place
+// (only replaced), so a shallow copy of the map is a safe snapshot.
+type inboundView struct {
+	out     inboundJSON
+	set     map[string]any
+	clients []clientJSON
+}
+
+func (v inboundView) render() inboundJSON {
+	v.set["clients"] = v.clients
+	b, _ := json.Marshal(v.set)
+	v.out.Settings = string(b)
+	return v.out
+}
+
 // projectInbound renders the old-API object. withClients=false skips the heavy parts.
 func (s *Store) projectInboundLocked(in *Inbound, withClients bool) inboundJSON {
-	set := map[string]any{}
+	return s.viewInboundLocked(in, withClients).render()
+}
+
+func (s *Store) viewInboundLocked(in *Inbound, withClients bool) inboundView {
+	set := make(map[string]any, len(in.Settings)+1)
 	for k, v := range in.Settings {
 		set[k] = v
 	}
@@ -110,10 +130,7 @@ func (s *Store) projectInboundLocked(in *Inbound, withClients bool) inboundJSON 
 			out.Down += a.Down
 		}
 	}
-	set["clients"] = clients
-	b, _ := json.Marshal(set)
-	out.Settings = string(b)
-	return out
+	return inboundView{out: out, set: set, clients: clients}
 }
 
 func (s *Store) accountByIdentityLocked(inboundID int, ident string) *Account {

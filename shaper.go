@@ -21,9 +21,10 @@ type shaper struct {
 	mu    sync.Mutex
 	q     chan func()
 	st    *Store
-	run   func(args ...string) error // replaceable in tests
-	route func(ip string) string     // device for a tunnel address
-	htb   map[string]bool            // shared devices that already have the HTB root
+	run   func(args ...string) error  // replaceable in tests
+	show  func(args ...string) string // tc output (replaceable in tests)
+	route func(ip string) string      // device for a tunnel address
+	htb   map[string]bool             // shared devices that already have the HTB root
 }
 
 var Shaper = newShaper()
@@ -38,6 +39,12 @@ func newShaper() *shaper {
 			return fmt.Errorf("tc %s: %v: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
 		}
 		return nil
+	}
+	s.show = func(args ...string) string {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		out, _ := exec.CommandContext(ctx, "tc", args...).Output()
+		return string(out)
 	}
 	s.route = func(ip string) string {
 		out, err := exec.Command("ip", "-4", "-o", "route", "get", ip).Output()
@@ -176,7 +183,9 @@ func (s *shaper) applyShared(dev, vip string, down, up int) {
 		have := s.htb[dev]
 		s.htb[dev] = true
 		s.mu.Unlock()
-		if !have {
+		// after a panel restart the root may already exist and carry other users' classes:
+		// replacing it would silently remove their limits
+		if !have && !strings.Contains(s.show("qdisc", "show", "dev", dev, "root"), "htb 1:") {
 			s.run("qdisc", "replace", "dev", dev, "root", "handle", "1:", "htb", "default", "0")
 		}
 		cid := fmt.Sprintf("1:%x", m)

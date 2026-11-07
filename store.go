@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -113,13 +114,20 @@ type GlobalSettings struct {
 }
 
 type Store struct {
-	mu    sync.RWMutex
-	path  string
-	st    State
-	dirty bool
-	stop  chan struct{}
-	done  chan struct{}
+	mu   sync.RWMutex
+	path string
+	st   State
+	// dirty: accounts or settings changed, saved within 3 s. trafficDirty: only usage counters
+	// changed (that happens all the time), saved once a minute so the disk is not rewritten
+	// every 3 s; a crash loses at most a minute of counted traffic.
+	dirty, trafficDirty atomic.Bool
+	flushMu             sync.Mutex // one writer of the state file at a time
+	lastFlush           time.Time
+	stop                chan struct{}
+	done                chan struct{}
 }
+
+const trafficFlushEvery = time.Minute
 
 func randHex(n int) string {
 	b := make([]byte, n)
@@ -147,27 +155,28 @@ func OpenStore(path string) (*Store, error) {
 	if s.st.NextInbound < 1 {
 		s.st.NextInbound = 1
 	}
+	s.normalizeKeysLocked()
 	if s.st.Secret == "" {
 		s.st.Secret = randHex(32)
-		s.dirty = true
+		s.dirty.Store(true)
 	}
 	if s.st.RadiusKey == "" {
 		s.st.RadiusKey = randHex(12)
-		s.dirty = true
+		s.dirty.Store(true)
 	}
 	if !s.st.Global.TotalInit {
 		s.rebaseTotalLocked()
 		s.st.Global.TotalInit = true
-		s.dirty = true
+		s.dirty.Store(true)
 	}
 	g := &s.st.Global
 	if g.BasePath == "" {
 		g.BasePath = "/"
-		s.dirty = true
+		s.dirty.Store(true)
 	}
 	if g.TgCpuAlert == 0 && !g.TgCpuTouched {
 		g.TgCpuAlert = 80
-		s.dirty = true
+		s.dirty.Store(true)
 	}
 	if g.SessionMinutes == 0 {
 		g.SessionMinutes = 1440
@@ -192,7 +201,9 @@ func (s *Store) flusher() {
 	for {
 		select {
 		case <-t.C:
-			s.Flush()
+			if s.dirty.Load() || (s.trafficDirty.Load() && time.Since(s.lastFlushed()) >= trafficFlushEvery) {
+				s.Flush()
+			}
 		case <-s.stop:
 			s.Flush()
 			return
@@ -200,23 +211,65 @@ func (s *Store) flusher() {
 	}
 }
 
+func (s *Store) lastFlushed() time.Time {
+	s.flushMu.Lock()
+	defer s.flushMu.Unlock()
+	return s.lastFlush
+}
+
+// normalizeKeysLocked makes every account's map key lower(trimmed email). Every lookup uses
+// that form; an account stored under another key would look "deleted" to the enforcer.
+func (s *Store) normalizeKeysLocked() {
+	for k, a := range s.st.Accounts {
+		if a == nil {
+			delete(s.st.Accounts, k)
+			s.dirty.Store(true)
+			continue
+		}
+		if nk := ekey(a.Email); nk != k {
+			delete(s.st.Accounts, k)
+			if s.st.Accounts[nk] == nil {
+				s.st.Accounts[nk] = a
+			}
+			s.dirty.Store(true)
+		}
+	}
+}
+
 func (s *Store) Close() { close(s.stop); <-s.done }
 
 // Touch marks the state dirty; callers hold s.mu.
-func (s *Store) touch() { s.dirty = true }
+func (s *Store) touch() { s.dirty.Store(true) }
 
+// touchTraffic marks usage counters changed (saved once a minute); callers hold s.mu.
+func (s *Store) touchTraffic() { s.trafficDirty.Store(true) }
+
+// Flush writes the state file when anything changed. The state is serialized under the READ
+// lock, so logins and accounting keep running while it is saved.
 func (s *Store) Flush() error {
-	s.mu.Lock()
-	if !s.dirty {
-		s.mu.Unlock()
+	s.flushMu.Lock()
+	defer s.flushMu.Unlock()
+	if !s.dirty.Load() && !s.trafficDirty.Load() {
 		return nil
 	}
+	// cleared before the snapshot: a change made after it marks the state dirty again
+	s.dirty.Store(false)
+	s.trafficDirty.Store(false)
+	s.mu.RLock()
 	b, err := json.Marshal(&s.st)
-	s.dirty = false
-	s.mu.Unlock()
+	s.mu.RUnlock()
+	if err == nil {
+		err = s.writeFile(b)
+	}
 	if err != nil {
+		s.dirty.Store(true)
 		return err
 	}
+	s.lastFlush = time.Now()
+	return nil
+}
+
+func (s *Store) writeFile(b []byte) error {
 	tmp := s.path + ".tmp"
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return err
@@ -289,15 +342,15 @@ func (s *Store) rebaseTotalLocked() {
 	g := &s.st.Global
 	if sum > g.TotalUsed {
 		g.TotalUsed = sum
-		s.dirty = true
+		s.dirty.Store(true)
 	}
 	if up > g.TotalUp {
 		g.TotalUp = up
-		s.dirty = true
+		s.dirty.Store(true)
 	}
 	if down > g.TotalDown {
 		g.TotalDown = down
-		s.dirty = true
+		s.dirty.Store(true)
 	}
 }
 
@@ -317,6 +370,6 @@ func (s *Store) addInboundBytes(inbound int, up, down int64) {
 	s.st.Global.TotalUp += up
 	s.st.Global.TotalDown += down
 	s.st.Global.TotalUsed += up + down
-	s.touch()
+	s.touchTraffic()
 	s.mu.Unlock()
 }

@@ -75,7 +75,7 @@ func (a *API) Handler() http.Handler {
 	if a.base != "/" && a.base != "" {
 		h = http.StripPrefix(strings.TrimSuffix(a.base, "/"), mux)
 	}
-	return gzipMW(h)
+	return gzipMW(bufferMW(h))
 }
 
 // api guards a handler: no cookie => bare 404 (hides the endpoints, like the old panel).
@@ -121,24 +121,33 @@ func pathID(r *http.Request) int { n, _ := strconv.Atoi(r.PathValue("id")); retu
 
 func (a *API) list(w http.ResponseWriter, r *http.Request) {
 	light := r.URL.Query().Get("light") == "1"
+	// copy under the lock (fast), serialize after releasing it (the slow part)
 	a.st.mu.RLock()
-	defer a.st.mu.RUnlock()
-	out := []inboundJSON{}
+	var views []inboundView
 	for _, in := range a.st.sortedInbounds() {
-		out = append(out, a.st.projectInboundLocked(in, !light))
+		views = append(views, a.st.viewInboundLocked(in, !light))
+	}
+	a.st.mu.RUnlock()
+	out := make([]inboundJSON, 0, len(views))
+	for _, v := range views {
+		out = append(out, v.render())
 	}
 	ok(w, "", out)
 }
 
 func (a *API) get(w http.ResponseWriter, r *http.Request) {
 	a.st.mu.RLock()
-	defer a.st.mu.RUnlock()
 	in := a.st.st.Inbounds[pathID(r)]
+	var v inboundView
+	if in != nil {
+		v = a.st.viewInboundLocked(in, true)
+	}
+	a.st.mu.RUnlock()
 	if in == nil {
 		fail(w, "Inbound not found")
 		return
 	}
-	ok(w, "", a.st.projectInboundLocked(in, true))
+	ok(w, "", v.render())
 }
 
 func (a *API) clientTraffic(w http.ResponseWriter, r *http.Request) {

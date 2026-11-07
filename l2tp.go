@@ -60,8 +60,10 @@ func pppOptions(in *Inbound, radConf string) string {
 	w("mtu %d", mtu)
 	w("mru %d", mtu)
 	w("nodefaultroute")
-	w("lcp-echo-interval 6")
-	w("lcp-echo-failure 3")
+	// a link is declared dead after 60 s without an answer: mobile networks in Iran (and the relay
+	// in front of the server) stall for 10-20 s often enough that a shorter limit drops users
+	w("lcp-echo-interval 10")
+	w("lcp-echo-failure 6")
 	w("connect-delay 5000")
 	w("plugin radius.so")
 	w("radius-config-file %s", radConf)
@@ -88,8 +90,8 @@ func xl2tpdConf(in *Inbound, optFile, ctlFile string) string {
 	return b.String()
 }
 
-func (e *Engine) l2tpDaemons(dir, run string, secret string) map[string]*procDaemon {
-	out := map[string]*procDaemon{}
+func (e *Engine) l2tpDaemons(dir, run string, secret string) (out map[string]*procDaemon, keep map[string]bool) {
+	out, keep = map[string]*procDaemon{}, map[string]bool{}
 	e.st.mu.RLock()
 	var ins []*Inbound
 	for _, in := range e.st.st.Inbounds {
@@ -101,16 +103,23 @@ func (e *Engine) l2tpDaemons(dir, run string, secret string) map[string]*procDae
 	e.st.mu.RUnlock()
 	bin, _ := exec.LookPath("xl2tpd")
 	if bin == "" {
+		bin = "/usr/sbin/xl2tpd"
+	}
+	if _, err := os.Stat(bin); err != nil {
+		for _, in := range ins {
+			keep[fmt.Sprint(in.ID)] = true
+		}
 		if len(ins) > 0 {
 			Events.Add("error", "l2tp", "", "xl2tpd is not installed")
 		}
-		return out
+		return
 	}
 	for _, in := range ins {
 		d := filepath.Join(dir, "l2tp", strconv.Itoa(in.ID))
 		os.MkdirAll(d, 0o700)
 		radConf, err := writeRadiusClient(filepath.Join(d, "radius"), secret, "vl-l2tp", false)
 		if err != nil {
+			keep[fmt.Sprint(in.ID)] = true
 			continue
 		}
 		opt := filepath.Join(d, "options")
@@ -121,25 +130,42 @@ func (e *Engine) l2tpDaemons(dir, run string, secret string) map[string]*procDae
 		writeIfChanged(conf, confBody, 0o600)
 		pid := filepath.Join(run, fmt.Sprintf("xl2tpd-%d.pid", in.ID))
 		out[fmt.Sprint(in.ID)] = &procDaemon{adoptUnknown: true, name: fmt.Sprintf("xl2tpd-%d", in.ID), bin: bin,
-			args:    []string{"-c", conf, "-p", pid, "-C", filepath.Join(run, fmt.Sprintf("l2tp-%d.control", in.ID))},
-			pidFile: pid, match: "xl2tpd", hash: fingerprint(optBody, confBody, secret)}
+			args: []string{"-c", conf, "-p", pid, "-C", filepath.Join(run, fmt.Sprintf("l2tp-%d.control", in.ID))},
+			// pppd reads the options and the RADIUS client config for every new connection, so only a
+			// change of xl2tpd.conf itself needs an xl2tpd restart (which drops every L2TP user)
+			pidFile: pid, hashFile: pid + ".hash2", match: "xl2tpd", hash: fingerprint(confBody)}
 	}
-	return out
+	return
 }
 
-// killPPP ends one pppd session. The radius plugin reports the ppp unit as NAS-Port,
-// and pppd keeps /var/run/ppp<unit>.pid for that link.
-func killPPP(s *Session) {
-	dev := s.Dev
-	if dev == "" && s.VIP != "" { // find the link by its peer address
-		if out, err := exec.Command("ip", "-4", "-o", "addr", "show").Output(); err == nil {
-			for _, l := range strings.Split(string(out), "\n") {
-				if f := strings.Fields(l); len(f) > 3 && strings.HasPrefix(f[1], "ppp") && strings.Contains(l, "peer "+s.VIP+"/") {
-					dev = f[1]
-					break
-				}
+// pppDevByPeer maps tunnel (peer) addresses to their ppp devices, from `ip -4 -o addr show`.
+func pppDevByPeer() map[string]string {
+	m := map[string]string{}
+	out, err := exec.Command("ip", "-4", "-o", "addr", "show").Output()
+	if err != nil {
+		return m
+	}
+	for _, l := range strings.Split(string(out), "\n") {
+		f := strings.Fields(l)
+		if len(f) < 6 || !strings.HasPrefix(f[1], "ppp") {
+			continue
+		}
+		for i := 0; i+1 < len(f); i++ {
+			if f[i] == "peer" {
+				m[strings.SplitN(f[i+1], "/", 2)[0]] = f[1]
 			}
 		}
+	}
+	return m
+}
+
+// killPPP ends one pppd session. The radius plugin reports the ppp unit as NAS-Port, and pppd
+// keeps /var/run/ppp<unit>.pid for that link. Units are reused, so when the tunnel address is
+// known the device is looked up by it: a stale session must never drop someone else's link.
+func killPPP(s *Session) {
+	dev := s.Dev
+	if s.VIP != "" {
+		dev = pppDevByPeer()[s.VIP]
 	}
 	if dev == "" || !strings.HasPrefix(dev, "ppp") {
 		return
