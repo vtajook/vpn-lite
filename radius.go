@@ -266,8 +266,10 @@ func (r *RadiusServer) handleAuth(from *net.UDPAddr, p *radPkt) []byte {
 			proto = "openconnect"
 		}
 	}
-	reject := func(reason string, mschapIdent int) []byte {
-		Events.Add("reject", proto, user, "%s", reason)
+	var rejectWith func(reason, logReason string, mschapIdent int) []byte
+	reject := func(reason string, mschapIdent int) []byte { return rejectWith(reason, reason, mschapIdent) }
+	rejectWith = func(reason, logReason string, mschapIdent int) []byte {
+		Events.Add("reject", proto, user, "%s", logReason)
 		resp := &radPkt{Code: radAccessReject, ID: p.ID, Attrs: []radAttr{{attrReplyMessage, []byte(reason)}}}
 		if mschapIdent >= 0 {
 			resp.Attrs = append(resp.Attrs, msVSA(2, append([]byte{byte(mschapIdent)},
@@ -340,8 +342,11 @@ func (r *RadiusServer) handleAuth(from *net.UDPAddr, p *radPkt) []byte {
 		}
 		return reject("no supported credential (attributes: "+strings.Join(kinds, ",")+")", -1)
 	}
-	if acc == nil {
-		verify = func(string) bool { return false }
+	if acc == nil { // the client only ever sees "bad credentials"; the log says what is really wrong
+		return rejectWith("bad credentials", "unknown user: no such account in the panel", msIdent)
+	}
+	if inbound == 0 {
+		return rejectWith("not a member of this inbound", "account is not on any "+proto+" service", msIdent)
 	}
 	res := r.st.AuthorizeFn(inbound, user, verify, nil)
 	if !res.OK {
