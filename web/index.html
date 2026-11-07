@@ -17,6 +17,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .side hr{border:0;border-top:1px solid rgba(255,255,255,.1);margin:10px 4px}
 .main{flex:1;min-width:0;padding:22px 26px}.top{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap}.top h2{margin:0;flex:1;font-size:21px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;box-shadow:var(--sh)}
+.dg{display:grid;gap:10px;grid-template-columns:repeat(3,1fr);margin-bottom:14px}@media(min-width:900px){.dg{grid-template-columns:repeat(4,1fr)}}
+.dc{padding:12px;margin:0;min-width:0}.dh{display:flex;align-items:center;gap:8px;margin-bottom:10px}.di{font-size:18px}.dl{font-size:12px;color:var(--mu);flex:1}
+.dv{font-size:20px;font-weight:700;color:var(--c)}.dm{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}.d2{display:flex;justify-content:space-between;font-size:11px;color:var(--mu);margin-top:6px;gap:4px;flex-wrap:wrap}
 .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));margin-bottom:14px}
 .stat{position:relative;overflow:hidden;padding-inline-start:20px}.stat:before{content:"";position:absolute;inset-block:0;inset-inline-start:0;width:5px;background:var(--c,var(--pr))}
 .stat b{display:block;font-size:25px;margin-top:22px;text-align:start;color:var(--c,var(--pr))}.stat span{color:var(--mu);font-size:12.5px}.stat em{position:absolute;inset-inline-end:12px;top:8px;font-style:normal;font-size:22px;opacity:.9}
@@ -53,7 +56,7 @@ const T = {
  en:{dash:"Dashboard",accounts:"Accounts",inbounds:"Inbounds",online:"Online",logs:"Logs",settings:"Settings",login:"Sign in",user:"Username",pass:"Password",
   add:"Add account",bulkc:"Bulk create",search:"Search…",all:"All",active:"Active",expired:"Expired",depleted:"Depleted",disabled:"Disabled",save:"Save",cancel:"Cancel",
   del:"Delete",edit:"Edit",reset:"Reset traffic",kick:"Kick",enable:"Enable",disable:"Disable",extend:"Extend",used:"Total usage (lifetime)",expiry:"Expiry",devices:"Devices",speed:"Speed",
-  rx:"Received (total)",tx:"Sent (total)",killall:"Kill all",ips:"IP",nsess:"Count",  status:"Status",email:"Name / email",total:"Quota (GB, 0=∞)",days:"Days (0=∞)",hours:"Extra hours (e.g. 2 for a 2-hour test)",limit:"Simultaneous connections, all protocols together (0 = panel default)",down:"Download KB/s (0=∞)",up:"Upload KB/s (0=∞)",
+  disk:"Disk",usertraffic:"Users traffic",servertraffic:"Server traffic",disabled:"Disabled",  rx:"Received (total)",tx:"Sent (total)",killall:"Kill all",ips:"IP",nsess:"Count",  status:"Status",email:"Name / email",total:"Quota (GB, 0=∞)",days:"Days (0=∞)",hours:"Extra hours (e.g. 2 for a 2-hour test)",limit:"Simultaneous connections, all protocols together (0 = panel default)",down:"Download KB/s (0=∞)",up:"Upload KB/s (0=∞)",
   comment:"Comment",resetd:"Auto reset (days)",protocols:"Services",sel:"selected",confirm:"Are you sure?",saved:"Saved",never:"never",left:"left",unl:"∞",
   page:"Page",of:"of",sessions:"Sessions",onlineu:"Online users",cpu:"CPU",mem:"Memory",net:"Network",members:"accounts",port:"Port",remark:"Name",proto:"Protocol",
   gen:"Generate certificates",rxtx:"Received / sent (all time)",totalused:"Total usage (all time)",totalin:"Services",users:"Users",ops:"Operations",resetaccts:"Reset usage of all accounts",resetsvc:"Reset the traffic counters of all services",addr:"Connection address",traffic:"Traffic",deflimit:"Default simultaneous connections per account",allowmulti:"Allow several protocols at the same time (off = while connected on one protocol, another is refused)",rsttotal:"Reset total usage",rstq:"Reset the server total usage counter to zero? Accounts keep their own usage.",delexp:"Delete expired",delexpq:"Delete {n} expired accounts permanently?",noexp:"No expired accounts",uptime:"Uptime",ver:"Version",update:"Update panel",reboot:"Reboot server",rebootq:"Reboot the whole server? All VPN connections drop for a minute.",rebooting:"Rebooting…",uptodate:"Already up to date",updq:"Update panel",updating:"Downloading update…",getssl:"Get SSL for connection domain (optional)",sslwait:"Requesting certificate from Let's Encrypt, up to a minute…",condomreq:"Enter the connection domain first",newin:"Add inbound",count:"How many",prefix:"Prefix",created:"Created",copy:"Copy",time:"Time",kind:"Kind",detail:"Detail",
@@ -65,7 +68,7 @@ const T = {
  fa:{dash:"داشبورد",accounts:"اکانت‌ها",inbounds:"سرویس‌ها",online:"آنلاین",logs:"لاگ",settings:"تنظیمات",login:"ورود",user:"نام کاربری",pass:"رمز",
   add:"افزودن اکانت",bulkc:"ساخت گروهی",search:"جستجو…",all:"همه",active:"فعال",expired:"منقضی",depleted:"تمام‌شده",disabled:"غیرفعال",save:"ذخیره",cancel:"انصراف",
   del:"حذف",edit:"ویرایش",reset:"ریست حجم",kick:"قطع",enable:"فعال",disable:"غیرفعال",extend:"تمدید",used:"مصرف کل (از ابتدا)",expiry:"انقضا",devices:"دستگاه",speed:"سرعت",
-  rx:"دریافت کل",tx:"ارسال کل",killall:"قطع همه",ips:"آی‌پی",nsess:"تعداد",  status:"وضعیت",email:"نام / ایمیل",total:"حجم (گیگ، ۰=نامحدود)",days:"روز (۰=نامحدود)",hours:"ساعت (مثلاً ۲ برای اکانت تست دو ساعته)",limit:"تعداد اتصال همزمان، مجموع همه‌ی پروتکل‌ها (۰ = پیش‌فرض پنل)",down:"دانلود KB/s (۰=نامحدود)",up:"آپلود KB/s (۰=نامحدود)",
+  disk:"هارد",usertraffic:"ترافیک کاربران",servertraffic:"ترافیک سرور",disabled:"غیرفعال",  rx:"دریافت کل",tx:"ارسال کل",killall:"قطع همه",ips:"آی‌پی",nsess:"تعداد",  status:"وضعیت",email:"نام / ایمیل",total:"حجم (گیگ، ۰=نامحدود)",days:"روز (۰=نامحدود)",hours:"ساعت (مثلاً ۲ برای اکانت تست دو ساعته)",limit:"تعداد اتصال همزمان، مجموع همه‌ی پروتکل‌ها (۰ = پیش‌فرض پنل)",down:"دانلود KB/s (۰=نامحدود)",up:"آپلود KB/s (۰=نامحدود)",
   comment:"توضیح",resetd:"ریست خودکار (روز)",protocols:"سرویس‌ها",sel:"انتخاب‌شده",confirm:"مطمئنی؟",saved:"ذخیره شد",never:"هرگز",left:"مانده",unl:"∞",
   page:"صفحه",of:"از",sessions:"اتصال‌ها",onlineu:"کاربر آنلاین",cpu:"پردازنده",mem:"حافظه",net:"شبکه",members:"اکانت",port:"پورت",remark:"نام",proto:"پروتکل",
   gen:"ساخت گواهی",rxtx:"دریافت / ارسال کل (از ابتدا)",totalused:"مصرف کل (از ابتدا)",totalin:"سرویس‌ها",users:"کاربران",ops:"عملیات کلی",resetaccts:"ریست مصرف همه‌ی اکانت‌ها",resetsvc:"ریست شمارنده‌ی ترافیک همه‌ی سرویس‌ها",addr:"نشانی اتصال",traffic:"ترافیک",deflimit:"پیش‌فرض تعداد اتصال همزمان هر اکانت",allowmulti:"اجازه‌ی اتصال همزمان با چند پروتکل (خاموش = تا وقتی با یک پروتکل وصله، پروتکل دیگر وصل نمی‌شود)",rsttotal:"ریست مصرف کل",rstq:"شمارنده‌ی مصرف کل سرور صفر شود؟ مصرف هر اکانت دست نمی‌خورد.",delexp:"حذف منقضی‌ها",delexpq:"{n} اکانت منقضی برای همیشه حذف شود؟",noexp:"اکانت منقضی‌ای نیست",uptime:"آپ‌تایم",ver:"نسخه",update:"آپدیت پنل",reboot:"ریبوت سرور",rebootq:"کل سرور ریبوت شود؟ اتصال‌ها حدود یک دقیقه قطع می‌شود.",rebooting:"در حال ریبوت…",uptodate:"آخرین نسخه نصب است",updq:"آپدیت پنل",updating:"در حال دانلود آپدیت…",getssl:"دریافت SSL برای دامنه اتصال (اختیاری)",sslwait:"در حال دریافت گواهی از Let's Encrypt، تا یک دقیقه…",condomreq:"اول دامنه اتصال را وارد کنید",newin:"سرویس جدید",count:"تعداد",prefix:"پیشوند",created:"ساخته شد",copy:"کپی",time:"زمان",kind:"نوع",detail:"جزئیات",
@@ -126,15 +129,23 @@ async function doUpdate(){const j=await api("panel/ui/updateCheck");if(!j.succes
  if(!r.success){toast(r.msg||"error",1);return}toast(r.msg);setTimeout(()=>location.reload(),5000)}
 async function pDash(c){
  const draw=async()=>{const s=await call("panel/ui/summary");const st=s.status||{};inboundsCache=s.inbounds;
-  const stat=(ic,col,v,l)=>h("div",{class:"card stat",style:"--c:"+col},h("em",{},ic),h("b",{class:"num"},v),h("span",{},l));
+  const sy=s.sys,pc=n=>Math.max(0,Math.min(100,n||0));
+  const box=(ic,col,l,body)=>h("div",{class:"card dc",style:"--c:"+col},h("div",{class:"dh"},h("span",{class:"di"},ic),h("span",{class:"dl"},l)),body);
+  const big=v=>h("div",{class:"dv num"},v);
+  const meter=(p,left,right)=>h("div",{},h("div",{class:"dm"},h("span",{},left),h("b",{class:"num"},Math.round(p)+"%")),h("div",{class:"bar"+(p>90?" hi":"")},h("i",{style:"width:"+pc(p)+"%"})),right?h("div",{class:"mu num",style:"margin-top:4px;font-size:11px"},right):null);
+  const two=(a,b)=>h("div",{class:"d2"},h("span",{class:"num"},"⬆ "+a),h("span",{class:"num"},"⬇ "+b));
   c.replaceChildren(h("div",{class:"top"},h("h2",{},t("dash"))),
-   h("div",{class:"grid"},stat("🟢","#10b981",s.onlineUsers,t("onlineu")),stat("🔗","#06b6d4",s.sessions,t("sessions")),stat("👥","#6366f1",s.accounts,t("accounts")),
-    stat("✅","#f59e0b",st.active||0,t("active")),stat("⛔","#ef4444",(st.expired||0)+(st.depleted||0),t("expired")+" / "+t("depleted")),stat("📦","#8b5cf6",fmtB(s.usedBytes),t("used"))),
-   h("div",{class:"grid"},stat("⬇️","#0ea5e9",fmtB(s.totalDown||0),t("rx")),stat("⬆️","#ec4899",fmtB(s.totalUp||0),t("tx")),
-    stat("⚖️","#10b981","↓ "+fmtB(s.sys.rxBps)+"/s",t("net")+" ↑ "+fmtB(s.sys.txBps)+"/s"),stat("🧠","#06b6d4",s.sys.cpu.toFixed(0)+"%",t("cpu")),
-    stat("🌐","#6366f1",s.sys.mem.toFixed(0)+"%",t("mem")),stat("📈","#f59e0b",s.sys.load||"-","load")),
+   h("div",{class:"dg"},
+    box("👥","#6366f1",t("accounts"),big(s.accounts)),box("🌐","#10b981",t("onlineu"),big(s.onlineUsers)),box("✅","#3b82f6",t("active"),big(st.active||0)),
+    box("🚫","#f59e0b",t("disabled"),big(st.disabled||0)),box("📦","#ef4444",t("depleted"),big(st.depleted||0)),box("📅","#ef4444",t("expired"),big(st.expired||0)),
+    box("💾","#10b981",t("disk"),meter(sy.disk,fmtB(sy.diskUsed||0),fmtB(sy.diskTotal||0))),
+    box("🧠","#06b6d4",t("cpu"),meter(sy.cpu,"Cores: "+(sy.cores||"-"),sy.load||"")),
+    box("🧮","#eab308","RAM",meter(sy.mem,fmtB(sy.memUsed||0),fmtB(sy.memTotal||0))),
+    box("⏱️","#ef4444",t("uptime"),big(fmtUp(sy.uptime))),
+    box("👤","#f59e0b",t("usertraffic"),h("div",{},big(fmtB(s.usedBytes)),two(fmtB(s.totalUp||0),fmtB(s.totalDown||0)))),
+    box("🖥️","#6366f1",t("servertraffic"),h("div",{},big(fmtB((sy.netRx||0)+(sy.netTx||0))),two(fmtB(sy.netTx||0),fmtB(sy.netRx||0)),h("div",{class:"mu num",style:"font-size:11px"},"↓ "+fmtB(sy.rxBps)+"/s  ↑ "+fmtB(sy.txBps)+"/s")))),
    h("div",{class:"card",style:"display:flex;gap:8px;flex-wrap:wrap;align-items:center"},
-    h("span",{class:"mu",style:"flex:1;min-width:150px"},t("uptime")+": "+fmtUp(s.sys.uptime)+"  ·  "+t("ver")+": "+(s.sys.version||"-")),
+    h("span",{class:"mu",style:"flex:1;min-width:150px"},t("ver")+": "+(s.sys.version||"-")),
     h("button",{class:"btn p",onclick:doUpdate},"⬆ "+t("update")),
     h("button",{class:"btn",onclick:async()=>{if(!confirm(t("rstq")))return;await post("panel/ui/resetTotal");toast(t("saved"));draw()}},"↺ "+t("rsttotal")),
     h("button",{class:"btn d",onclick:async()=>{if(!confirm(t("rebootq")))return;await post("panel/ui/reboot");toast(t("rebooting"));setTimeout(()=>location.reload(),60000)}},"⟲ "+t("reboot"))),

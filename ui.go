@@ -9,10 +9,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -576,13 +578,21 @@ func (a *API) uiRestart(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------- system stats
 
 type sysInfo struct {
-	CPU    float64 `json:"cpu"`
-	MemPct float64 `json:"mem"`
-	Load   string  `json:"load"`
-	Uptime int64   `json:"uptime"`
-	Ver    string  `json:"version"`
-	RxBps  int64   `json:"rxBps"`
-	TxBps  int64   `json:"txBps"`
+	CPU      float64 `json:"cpu"`
+	MemPct   float64 `json:"mem"`
+	Load     string  `json:"load"`
+	Uptime   int64   `json:"uptime"`
+	Ver      string  `json:"version"`
+	RxBps    int64   `json:"rxBps"`
+	TxBps    int64   `json:"txBps"`
+	Cores    int     `json:"cores"`
+	MemUsed  int64   `json:"memUsed"`
+	MemTotal int64   `json:"memTotal"`
+	DiskPct  float64 `json:"disk"`
+	DiskUsed int64   `json:"diskUsed"`
+	DiskTot  int64   `json:"diskTotal"`
+	NetRx    int64   `json:"netRx"`
+	NetTx    int64   `json:"netTx"`
 }
 
 var (
@@ -635,6 +645,7 @@ func readSys() sysInfo {
 		}
 		if total > 0 {
 			s.MemPct = 100 * (1 - avail/total)
+			s.MemTotal, s.MemUsed = int64(total*1024), int64((total-avail)*1024)
 		}
 	}
 	if b, err := os.ReadFile("/proc/loadavg"); err == nil {
@@ -647,6 +658,13 @@ func readSys() sysInfo {
 		v, _ := strconv.ParseFloat(strings.Fields(string(b))[0], 64)
 		s.Uptime = int64(v)
 		s.Ver = version
+	}
+	s.Cores = runtime.NumCPU()
+	var fsb syscall.Statfs_t
+	if syscall.Statfs("/", &fsb) == nil && fsb.Blocks > 0 {
+		s.DiskTot = int64(fsb.Blocks) * int64(fsb.Bsize)
+		s.DiskUsed = s.DiskTot - int64(fsb.Bavail)*int64(fsb.Bsize)
+		s.DiskPct = 100 * float64(s.DiskUsed) / float64(s.DiskTot)
 	}
 	var rx, tx int64
 	if b, err := os.ReadFile("/proc/net/dev"); err == nil {
@@ -668,6 +686,7 @@ func readSys() sysInfo {
 			}
 		}
 	}
+	s.NetRx, s.NetTx = rx, tx
 	now := time.Now().UnixMilli()
 	if lastNet > 0 && now > lastNet {
 		dt := float64(now-lastNet) / 1000
