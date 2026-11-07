@@ -684,3 +684,12 @@ func TestResetTotalAndDeleteExpired(t *testing.T) {
 	}
 	st.mu.Unlock()
 }
+
+func TestRadiusDictionaryHasOcservAttributes(t *testing.T) {
+	// ocserv's radcli sends Connect-Info (77); a dictionary without it makes every login fail
+	for _, a := range []string{"Connect-Info\t77", "NAS-IPv6-Address\t95", "Framed-IPv6-Prefix\t97"} {
+		if !strings.Contains(radDictionary, a) {
+			t.Fatalf("dictionary lacks %q", a)
+		}
+	}
+}

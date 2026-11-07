@@ -107,7 +107,7 @@ func (e *Engine) ocservDaemons(dir, run, secret string) map[string]*procDaemon {
 		out[fmt.Sprint(in.ID)] = &procDaemon{name: fmt.Sprintf("ocserv-%d", in.ID), bin: bin,
 			args:    []string{"-c", conf},
 			pidFile: filepath.Join(run, fmt.Sprintf("ocserv-%d.pid", in.ID)), match: "ocserv",
-			hash: fingerprint(body, cert, key, secret)}
+			hash: fingerprint(body, cert, key, secret, radDictionary)}
 	}
 	return out
 }
