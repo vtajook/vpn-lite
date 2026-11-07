@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/exec"
@@ -948,14 +949,28 @@ func TestIranDirectRoutes(t *testing.T) {
 	if !strings.Contains(ovOn, `push "route 2.144.0.0 255.252.0.0 net_gateway"`) || !strings.Contains(ovOn, "redirect-gateway def1") {
 		t.Fatal("openvpn: Iran routes missing or redirect-gateway lost")
 	}
-	if !strings.Contains(ocOn, "no-route = 2.144.0.0/255.252.0.0") || !strings.Contains(ocOn, "route = default") {
-		t.Fatal("ocserv: Iran routes missing or default route lost")
+	if strings.Contains(ocOn, "route = default") || strings.Contains(ocOn, "no-route") {
+		t.Fatal("ocserv: plain routes only when Iran direct is on")
 	}
-	if n := strings.Count(ocOn, "no-route"); n != ciscoIranRoutes {
-		t.Fatalf("cisco should get %d routes, got %d", ciscoIranRoutes, n)
+	covered := func(ipStr string) bool {
+		a := netip.MustParseAddr(ipStr)
+		for _, p := range ciscoPlainRoutes(ciscoIranRoutes) {
+			if p.Contains(a) {
+				return true
+			}
+		}
+		return false
 	}
-	if n := strings.Count(ovOn, "net_gateway"); n < 1000 {
-		t.Fatalf("openvpn should get the full list, got %d", n)
+	if covered("2.144.0.1") || covered("10.1.2.3") || covered("192.168.1.1") {
+		t.Fatal("Iranian and private addresses must not be routed through the tunnel")
+	}
+	for _, x := range []string{"8.8.8.8", "1.1.1.1", "142.250.1.1", "2.143.255.255", "2.148.0.1", "200.1.1.1"} {
+		if !covered(x) {
+			t.Fatalf("%s must go through the tunnel", x)
+		}
+	}
+	if n := strings.Count(ocOn, "\nroute = "); n < 300 || n > 2500 {
+		t.Fatalf("unexpected number of cisco routes: %d", n)
 	}
 	if ovOn == ovOff || ocOn == ocOff {
 		t.Fatal("config must change so the daemon restarts")

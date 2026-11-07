@@ -31,9 +31,11 @@ func iranPrefixes() []netip.Prefix {
 	return out
 }
 
-// ciscoIranRoutes: Cisco/AnyConnect clients cope badly with thousands of split-exclude
-// entries, so Cisco gets only the largest ranges (about 91% of Iranian addresses).
-const ciscoIranRoutes = 400
+// ciscoIranRoutes: how many of the largest Iranian ranges Cisco clients reach directly
+// (about 84% of Iranian addresses). Several OpenConnect apps ignore the server's split-exclude
+// list, so Cisco is given plain routes covering everything except these ranges, which every
+// client applies. That costs about 1100 routes; more would be heavy for ocserv and clients.
+const ciscoIranRoutes = 200
 
 // iranLargest returns the n biggest ranges (all of them when n <= 0), in address order.
 func iranLargest(n int) []netip.Prefix {
@@ -52,6 +54,56 @@ func iranRouteLines(format string, max int) []string {
 	var out []string
 	for _, p := range iranLargest(max) {
 		out = append(out, fmt.Sprintf(format, p.Addr(), prefixMask(p.Bits())))
+	}
+	return out
+}
+
+// ciscoPlainRoutes returns routes covering the whole IPv4 space except the n largest Iranian
+// ranges and private/special ranges (those stay off the tunnel).
+func ciscoPlainRoutes(n int) []netip.Prefix {
+	type rng struct{ lo, hi uint64 }
+	toRng := func(p netip.Prefix) rng {
+		a := p.Addr().As4()
+		lo := uint64(a[0])<<24 | uint64(a[1])<<16 | uint64(a[2])<<8 | uint64(a[3])
+		return rng{lo, lo + uint64(1)<<(32-p.Bits()) - 1}
+	}
+	var ex []rng
+	for _, p := range iranLargest(n) {
+		ex = append(ex, toRng(p))
+	}
+	for _, c := range []string{"0.0.0.0/8", "10.0.0.0/8", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12", "192.168.0.0/16", "224.0.0.0/3"} {
+		ex = append(ex, toRng(netip.MustParsePrefix(c)))
+	}
+	sort.Slice(ex, func(i, j int) bool { return ex[i].lo < ex[j].lo })
+	var out []netip.Prefix
+	emit := func(lo, hi uint64) { // minimal CIDR cover of [lo, hi]
+		for lo <= hi {
+			size := uint64(1) << 32
+			if lo != 0 {
+				size = lo & -lo
+			}
+			for size > hi-lo+1 {
+				size >>= 1
+			}
+			bits := 32
+			for s := size; s > 1; s >>= 1 {
+				bits--
+			}
+			out = append(out, netip.PrefixFrom(netip.AddrFrom4([4]byte{byte(lo >> 24), byte(lo >> 16), byte(lo >> 8), byte(lo)}), bits))
+			lo += size
+		}
+	}
+	next := uint64(0)
+	for _, r := range ex {
+		if r.lo > next {
+			emit(next, r.lo-1)
+		}
+		if r.hi+1 > next {
+			next = r.hi + 1
+		}
+	}
+	if next <= 0xFFFFFFFF {
+		emit(next, 0xFFFFFFFF)
 	}
 	return out
 }
