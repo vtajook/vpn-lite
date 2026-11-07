@@ -976,3 +976,24 @@ func TestIranDirectRoutes(t *testing.T) {
 		t.Fatal("config must change so the daemon restarts")
 	}
 }
+
+func TestPppdRadiusClientConfig(t *testing.T) {
+	dir := t.TempDir()
+	conf, err := writeRadiusClient(dir, "s3cret", "vl-l2tp", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(conf)
+	if strings.Contains(string(b), "radius_deadtime") {
+		t.Fatal("pppd's bundled radiusclient rejects radius_deadtime")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "port-id-map")); err != nil {
+		t.Fatal("pppd needs the port-id-map file to exist")
+	}
+	cdir := t.TempDir()
+	cconf, _ := writeRadiusClient(cdir, "s3cret", "vl-oc", true)
+	cb, _ := os.ReadFile(cconf)
+	if !strings.Contains(string(cb), "radius_deadtime") || !strings.Contains(string(cb), "nas-identifier") {
+		t.Fatal("radcli config for ocserv must be unchanged")
+	}
+}

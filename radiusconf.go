@@ -114,13 +114,20 @@ func writeRadiusClient(dir, secret, nasID string, radcli bool) (conf string, err
 	if radcli {
 		key = "nas-identifier"
 	}
+	// pppd's radius.so bundles the old radiusclient library: it needs the port map file to exist
+	// (else every login fails with "Can't read map file") and rejects radcli-only keywords.
+	writeIfChanged(filepath.Join(dir, "port-id-map"), "", 0o644)
+	tail := ""
+	if radcli {
+		tail = "radius_deadtime\t0\n"
+	}
 	body := "auth_order\tradius\nlogin_tries\t4\nlogin_timeout\t60\n" +
 		"authserver\t127.0.0.1:1812\nacctserver\t127.0.0.1:1813\n" +
 		"servers\t" + filepath.Join(dir, "servers") + "\n" +
 		"dictionary\t" + filepath.Join(dir, "dictionary") + "\n" +
 		"seqfile\t" + filepath.Join(dir, "radius.seq") + "\n" +
 		"mapfile\t" + filepath.Join(dir, "port-id-map") + "\n" +
-		"default_realm\nradius_timeout\t3\nradius_retries\t2\nradius_deadtime\t0\n" +
+		"default_realm\nradius_timeout\t3\nradius_retries\t2\n" + tail +
 		key + "\t" + nasID + "\nbindaddr\t*\n"
 	conf = filepath.Join(dir, "radiusclient.conf")
 	writeIfChanged(conf, body, 0o600)
