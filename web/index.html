@@ -309,7 +309,7 @@ function inboundModal(i){const isNew=!i;const raw=i?JSON.parse(i.settings):{};de
 
 /* ---------- online / logs ---------- */
 async function pOnline(c){
- const draw=async()=>{const r=await call("panel/ui/sessions");
+ const draw=async()=>{const r=(await call("panel/ui/sessions"))||[];
   c.replaceChildren(h("div",{class:"top"},h("h2",{},t("online")+" ("+r.length+")")),h("div",{class:"card sc"},r.length?h("table",{},h("tr",{},["name","proto","IP","","↑ / ↓",t("time"),""].map(k=>h("th",{},k.length>2&&T.en[k]?t(k):k))),
    r.map(s=>h("tr",{},h("td",{},s.Email),h("td",{},h("span",{class:"tag"},s.Proto)),h("td",{},s.SrcIP),h("td",{class:"mu"},s.VIP),h("td",{},h("span",{class:"num"},fmtB(s.Up)+" / "+fmtB(s.Down))),h("td",{},ago(s.Start)),
     h("td",{},h("button",{class:"btn s d",onclick:async()=>{await post("panel/ui/kick?id="+encodeURIComponent(s.ID));setTimeout(draw,600)}},t("kick")))))):h("div",{class:"mu"},t("none"))))};

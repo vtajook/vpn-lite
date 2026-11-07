@@ -265,7 +265,7 @@ func (a *API) uiSessions(w http.ResponseWriter, r *http.Request) {
 		Start                        int64
 		Up, Down                     int64
 	}
-	var out []row
+	out := []row{}
 	for _, s := range Sessions.Snapshot() {
 		out = append(out, row{s.ID, s.Email, s.Proto, s.SrcIP, s.VIP, s.InboundID, s.Start, s.Up, s.Down})
 	}
