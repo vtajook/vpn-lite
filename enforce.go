@@ -187,6 +187,8 @@ func (s *Store) checkAccount(inboundID int, user string, verify func(stored stri
 		res.Reason = "not a member of this inbound"
 	case !acc.Enable:
 		res.Reason = "account disabled"
+	case ownerFrozen(acc.Owner):
+		res.Reason = "agency accounts suspended"
 	case acc.expired(now):
 		res.Reason = "account expired"
 	case acc.overQuota():
@@ -366,6 +368,8 @@ func (s *Store) enforceOnce() {
 			why = "account deleted"
 		case !acc.Enable:
 			why = "account disabled"
+		case ownerFrozen(acc.Owner):
+			why = "agency accounts suspended"
 		case acc.expired(now):
 			why = "account expired"
 		case acc.overQuota():

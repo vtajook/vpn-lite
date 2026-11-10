@@ -1364,6 +1364,7 @@ func (a *API) agencyRoutes(mux *http.ServeMux) {
 	rt("POST", "/agents/save", roleManager, a.agAgentSave)
 	rt("POST", "/agents/{id}/wallet", roleManager, a.agWallet)
 	rt("POST", "/agents/{id}/ban", roleManager, a.agBan)
+	rt("POST", "/agents/{id}/freeze", roleManager, a.agFreeze)
 	rt("POST", "/agents/{id}/delete", roleManager, a.agAgentDelete)
 	rt("POST", "/agents/{id}/move", roleAdmin, a.agAgentMove)
 	rt("POST", "/agents/{id}/login", roleAdmin, a.agImpersonate)
@@ -1807,6 +1808,7 @@ type agentRow struct {
 	Accounts   int       `json:"accounts"`
 	Active     int       `json:"active"`
 	Online     int       `json:"online"`
+	Used       int64     `json:"used"`       // traffic used by its accounts
 	SalesMonth int       `json:"salesMonth"` // own sales and renewals in 30 days
 	PaidMonth  int64     `json:"paidMonth"`  // what it paid for them
 	LastSale   int64     `json:"lastSale"`
@@ -1816,7 +1818,10 @@ type agentRow struct {
 func (a *API) agAgents(w http.ResponseWriter, r *http.Request) {
 	me := agentOf(r)
 	now := nowMs()
-	type cnt struct{ n, active, online int }
+	type cnt struct {
+		n, active, online int
+		used              int64
+	}
 	counts := map[int]*cnt{}
 	on := onlineCounts()
 	a.st.mu.RLock()
@@ -1830,6 +1835,7 @@ func (a *API) agAgents(w http.ResponseWriter, r *http.Request) {
 			counts[acc.Owner] = c
 		}
 		c.n++
+		c.used += acc.Up + acc.Down
 		if statusOf(acc, now) == "active" {
 			c.active++
 		}
@@ -1869,7 +1875,7 @@ func (a *API) agAgents(w http.ResponseWriter, r *http.Request) {
 			row.ParentName = p.Username
 		}
 		if c := counts[x.ID]; c != nil {
-			row.Accounts, row.Active, row.Online = c.n, c.active, c.online
+			row.Accounts, row.Active, row.Online, row.Used = c.n, c.active, c.online, c.used
 		}
 		rows = append(rows, row)
 	}
@@ -2023,6 +2029,7 @@ func (a *API) agAgentSave(w http.ResponseWriter, r *http.Request) {
 	if isNew {
 		Ag.f.NextAgent++
 	}
+	Ag.refreshFrozenLocked()
 	if err := Ag.saveLocked(); err != nil {
 		if prev == nil {
 			delete(Ag.f.Agents, key)
@@ -2154,6 +2161,65 @@ func (a *API) agBan(w http.ResponseWriter, r *http.Request) {
 	ok(w, "saved", nil)
 }
 
+// agFreeze stops (or brings back) every account of an agency and of its sub-agents at once,
+// without touching the accounts themselves: the agency cannot switch them back on.
+func (a *API) agFreeze(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		On   bool   `json:"on"`
+		Note string `json:"note"`
+	}
+	if readJSON(r, &req) != nil {
+		fail(w, "bad request")
+		return
+	}
+	me, id := agentOf(r), pathID(r)
+	Ag.mu.Lock()
+	if !Ag.managesLocked(me, id) {
+		Ag.mu.Unlock()
+		fail(w, "agent not found")
+		return
+	}
+	x := Ag.agentLocked(id)
+	x.Frozen, x.FrozenNote = req.On, strings.TrimSpace(req.Note)
+	err := Ag.saveLocked()
+	Ag.refreshFrozenLocked()
+	sub := Ag.subtreeLocked(id)
+	act := "agent:freeze"
+	if !req.On {
+		act = "agent:unfreeze"
+	}
+	Ag.logLocked(actorOf(r), act, "agent:"+itoa(id), clientIP(r), "%s %s", x.Username, x.FrozenNote)
+	name, chat := x.Username, x.TgChat
+	Ag.mu.Unlock()
+	if err != nil {
+		fail(w, err.Error())
+		return
+	}
+	n := 0
+	var kick []string
+	a.st.mu.RLock()
+	for _, acc := range a.st.st.Accounts {
+		if sub[acc.Owner] {
+			n++
+			if req.On {
+				kick = append(kick, acc.Email)
+			}
+		}
+	}
+	a.st.mu.RUnlock()
+	for _, e := range kick {
+		Sessions.KickEmailWhy(e, "agency accounts suspended by the management")
+	}
+	if chat != "" {
+		if req.On {
+			a.st.TgSend(chat, "⛔ همه‌ی اکانت‌های نمایندگی "+name+" توسط مدیریت متوقف شد. "+req.Note)
+		} else {
+			a.st.TgSend(chat, "✅ اکانت‌های نمایندگی "+name+" دوباره فعال شد.")
+		}
+	}
+	ok(w, "saved", n)
+}
+
 func (a *API) agAgentDelete(w http.ResponseWriter, r *http.Request) {
 	me, id := agentOf(r), pathID(r)
 	a.st.mu.RLock()
@@ -2228,6 +2294,7 @@ func (a *API) agAgentMove(w http.ResponseWriter, r *http.Request) {
 		fail(w, err.Error())
 		return
 	}
+	Ag.refreshFrozenLocked()
 	Ag.logLocked(actorOf(r), "agent:move", "agent:"+itoa(id), clientIP(r), "parent %d → %d", old, req.Parent)
 	ok(w, "moved", nil)
 }
@@ -2693,6 +2760,7 @@ func (a *API) agDashboard(w http.ResponseWriter, r *http.Request) {
 		st := map[string]int{}
 		var expiring, low []acct
 		own, subAcc, online := 0, 0, 0
+		var usedSum int64
 		a.st.mu.RLock()
 		for _, acc := range a.st.st.Accounts {
 			if !mine(sub, acc) {
@@ -2703,6 +2771,7 @@ func (a *API) agDashboard(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			own++
+			usedSum += acc.Up + acc.Down
 			s := statusOf(acc, now)
 			st[s]++
 			online += on[strings.ToLower(acc.Email)]
@@ -2721,7 +2790,8 @@ func (a *API) agDashboard(w http.ResponseWriter, r *http.Request) {
 		if len(low) > 30 {
 			low = low[:30]
 		}
-		out["accounts"] = map[string]any{"own": own, "subtree": subAcc, "status": st, "online": online}
+		out["accounts"] = map[string]any{"own": own, "subtree": subAcc, "status": st, "online": online, "used": usedSum}
+		out["frozen"] = ownerFrozen(me)
 		out["expiring"], out["low"] = expiring, low
 		Ag.mu.RLock()
 		x := Ag.agentLocked(me)

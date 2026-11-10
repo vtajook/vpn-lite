@@ -361,3 +361,37 @@ func TestAgencyBackupRoundTrip(t *testing.T) {
 		t.Fatalf("restored balance %d", bal(id))
 	}
 }
+
+func TestAgencyFreezeStopsAccounts(t *testing.T) {
+	st, ts, admin := agencyEnv(t)
+	id := mkAgent(admin, "debt", 0, allPerms(), AgentLimits{CreditLimit: 1 << 40}, AgentPricing{})
+	c := newTClient(t, ts)
+	c.login("debt", "pass-debt")
+	c.must(c.form("/panel/api/inbounds/addClient", botAdd(1, "f1", "fp", 1, 5)), "sale")
+	login := func() string {
+		res, _ := st.checkAccount(1, "f1", func(pw string) bool { return pw == "fp" })
+		return res.Reason
+	}
+	if r := login(); r != "" {
+		t.Fatalf("before freeze: %q", r)
+	}
+	admin.must(admin.js(fmt.Sprintf("/panel/agency/agents/%d/freeze", id), map[string]any{"on": true, "note": "debt"}), "freeze")
+	if r := login(); r == "" {
+		t.Fatal("a frozen agency's account still logs in")
+	}
+	// the agency cannot bring it back, and cannot sell
+	c.js("/panel/ui/bulk", map[string]any{"action": "enable", "emails": []string{"f1"}})
+	if r := login(); r == "" {
+		t.Fatal("the agency re-enabled a frozen account")
+	}
+	if m := c.form("/panel/api/inbounds/addClient", botAdd(1, "f2", "fp2", 1, 5)); m["success"] == true {
+		t.Fatal("a frozen agency sold an account")
+	}
+	if !st.st.Accounts["f1"].Enable {
+		t.Fatal("freeze must not change the accounts themselves")
+	}
+	admin.must(admin.js(fmt.Sprintf("/panel/agency/agents/%d/freeze", id), map[string]any{"on": false}), "unfreeze")
+	if r := login(); r != "" {
+		t.Fatalf("after unfreeze: %q", r)
+	}
+}

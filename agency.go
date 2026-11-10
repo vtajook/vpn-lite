@@ -33,6 +33,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 const gib = 1 << 30
@@ -92,28 +93,32 @@ type APIKey struct {
 }
 
 type Agent struct {
-	ID        int          `json:"id"`
-	Parent    int          `json:"parent"` // 0 = the admin
-	Username  string       `json:"username"`
-	Hash      string       `json:"hash,omitempty"`
-	TokenVer  int          `json:"tokenVer"` // bumped to end every session of this agent
-	Brand     string       `json:"brand"`    // trade name
-	Title     string       `json:"title"`    // agency title
-	Phone     string       `json:"phone"`
-	TgChat    string       `json:"tgChat"` // numeric Telegram chat id for notices to the agent
-	Note      string       `json:"note"`
-	Enable    bool         `json:"enable"`
-	BanUntil  int64        `json:"banUntil"` // -1 = banned for good, > now = banned until then
-	BanReason string       `json:"banReason"`
-	Expiry    int64        `json:"expiry"` // agency ends (0 = never)
-	Created   int64        `json:"created"`
-	CreatedBy int          `json:"createdBy"` // 0 = admin
-	Perms     AgentPerms   `json:"perms"`
-	Limits    AgentLimits  `json:"limits"`
-	Pricing   AgentPricing `json:"pricing"`
-	APIKeys   []APIKey     `json:"apiKeys"`
-	APIAllow  []string     `json:"apiAllow"` // IPs allowed to use the API keys (empty = any)
-	APIRate   int          `json:"apiRate"`  // API requests per minute (0 = 120)
+	ID        int    `json:"id"`
+	Parent    int    `json:"parent"` // 0 = the admin
+	Username  string `json:"username"`
+	Hash      string `json:"hash,omitempty"`
+	TokenVer  int    `json:"tokenVer"` // bumped to end every session of this agent
+	Brand     string `json:"brand"`    // trade name
+	Title     string `json:"title"`    // agency title
+	Phone     string `json:"phone"`
+	TgChat    string `json:"tgChat"` // numeric Telegram chat id for notices to the agent
+	Note      string `json:"note"`
+	Enable    bool   `json:"enable"`
+	BanUntil  int64  `json:"banUntil"` // -1 = banned for good, > now = banned until then
+	BanReason string `json:"banReason"`
+	// Frozen: every account of this agency and of its sub-agents is refused service (as if
+	// disabled) until the manager lifts it; the agency cannot undo it and cannot sell meanwhile.
+	Frozen     bool         `json:"frozen"`
+	FrozenNote string       `json:"frozenNote"`
+	Expiry     int64        `json:"expiry"` // agency ends (0 = never)
+	Created    int64        `json:"created"`
+	CreatedBy  int          `json:"createdBy"` // 0 = admin
+	Perms      AgentPerms   `json:"perms"`
+	Limits     AgentLimits  `json:"limits"`
+	Pricing    AgentPricing `json:"pricing"`
+	APIKeys    []APIKey     `json:"apiKeys"`
+	APIAllow   []string     `json:"apiAllow"` // IPs allowed to use the API keys (empty = any)
+	APIRate    int          `json:"apiRate"`  // API requests per minute (0 = 120)
 }
 
 type Plan struct {
@@ -231,6 +236,32 @@ type AgencyStore struct {
 	nextSale int64
 }
 
+// frozenOwners is the set of agent ids whose accounts are frozen (their own flag or an
+// ancestor's). The VPN core reads it on every login, so it is a ready-made snapshot.
+var frozenOwners atomic.Pointer[map[int]bool]
+
+func ownerFrozen(owner int) bool {
+	if owner == 0 {
+		return false
+	}
+	m := frozenOwners.Load()
+	return m != nil && (*m)[owner]
+}
+
+// refreshFrozenLocked rebuilds the snapshot. Callers hold ag.mu.
+func (ag *AgencyStore) refreshFrozenLocked() {
+	m := map[int]bool{}
+	for _, a := range ag.f.Agents {
+		for _, x := range ag.chainLocked(a.ID) {
+			if x.Frozen {
+				m[a.ID] = true
+				break
+			}
+		}
+	}
+	frozenOwners.Store(&m)
+}
+
 // Ag is the agency store (nil when it could not be opened: the panel then runs without it).
 var Ag *AgencyStore
 
@@ -262,6 +293,7 @@ func OpenAgency(dir string) (*AgencyStore, error) {
 	}
 	ag.af, _ = os.OpenFile(filepath.Join(dir, "activity.jsonl"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	ag.loadActivity()
+	ag.refreshFrozenLocked()
 	return ag, nil
 }
 
@@ -1037,6 +1069,9 @@ func (ag *AgencyStore) checkLocked(id int, perm string, c SaleCheck) error {
 	if why := ag.chainActiveLocked(id); why != "" {
 		return errors.New(why)
 	}
+	if ownerFrozen(id) && (perm == "create" || perm == "renew" || perm == "reset" || perm == "bulk") {
+		return errors.New("the accounts of this agency are suspended by the management: settle your account first")
+	}
 	p := a.Perms
 	allowed := map[string]bool{"create": p.Create, "renew": p.Renew, "reset": p.Reset, "delete": p.Delete,
 		"suspend": p.Suspend, "edit": p.Edit, "bulk": p.Bulk}[perm]
@@ -1142,5 +1177,6 @@ func (ag *AgencyStore) Import(x agencyExport) error {
 	if ag.lf, err = os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err != nil {
 		return err
 	}
+	ag.refreshFrozenLocked()
 	return ag.saveLocked()
 }

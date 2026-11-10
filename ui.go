@@ -139,7 +139,7 @@ type accountRow struct {
 
 func statusOf(a *Account, now int64) string {
 	switch {
-	case !a.Enable:
+	case !a.Enable, ownerFrozen(a.Owner):
 		return "disabled"
 	case a.expired(now):
 		return "expired"

@@ -3,7 +3,7 @@
 // modal, field, toast, fmtB, fmtDate, expiryEditor, infoModal, AS, go, render, ...).
 (function(){
 const TX={
- fa:{wallet:"کیف پول",customers:"مشتریان",subagents:"زیرنماینده‌ها",reports:"گزارش‌ها",profile:"پروفایل",agents:"نمایندگان",agency:"فروش و نمایندگی",
+ fa:{frozen:"اکانت‌ها متوقف",freeze:"توقف اکانت‌ها",unfreeze:"فعال‌سازی اکانت‌ها",freezeq:"همه‌ی اکانت‌های این نماینده (و زیرنماینده‌هایش) قطع و غیرفعال شود؟ خودش نمی‌تواند فعالشان کند.",unfreezeq:"اکانت‌های این نماینده دوباره فعال شود؟",frozenmsg:"همه‌ی اکانت‌های شما توسط مدیریت متوقف شده است. برای فعال‌سازی، حساب خود را تسویه کنید.",wallet:"کیف پول",customers:"مشتریان",subagents:"زیرنماینده‌ها",reports:"گزارش‌ها",profile:"پروفایل",agents:"نمایندگان",agency:"فروش و نمایندگی",
   balance:"موجودی",credit:"سقف اعتبار",sell:"فروش اکانت",renew:"تمدید",plan:"پلن",custom:"دلخواه",price:"قیمت",services:"سرویس‌ها",customer:"مشتری",nocust:"— بدون مشتری —",
   gb:"حجم (گیگ)",days:"روز",hours:"ساعت",devices:"دستگاه همزمان",note:"یادداشت",created:"ساخته شد",fresh:"شروع دوره جدید (مصرف صفر شود و حجم = حجم پلن)",
   quote:"هزینه",willpay:"از کیف پول کم می‌شود",after:"موجودی بعد",newagent:"نماینده جدید",parent:"والد",admin:"مدیر",brand:"نام تجاری",title:"عنوان نمایندگی",
@@ -30,7 +30,7 @@ const TX={
   P:{create:"فروش اکانت جدید",renew:"تمدید و افزایش حجم/زمان",reset:"ریست حجم (با هزینه)",delete:"حذف اکانت (بازگشت وجه طبق قوانین)",suspend:"فعال/غیرفعال کردن اکانت",edit:"ویرایش (رمز، دستگاه، سرویس)",unlimited:"فروش نامحدود",bulk:"عملیات گروهی",subAgents:"ساخت زیرنماینده",transfer:"انتقال اکانت",api:"API اختصاصی"},
   L:{maxCustomers:"حداکثر تعداد اکانت",maxActive:"حداکثر اکانت فعال",maxDailyCreates:"حداکثر ساخت در روز",maxSoldGB:"سقف کل حجم فروش (گیگ)",maxDays:"حداکثر روز هر فروش",maxGB:"حداکثر حجم هر اکانت (گیگ)",maxDevices:"حداکثر دستگاه هر اکانت",maxSubAgents:"حداکثر زیرنماینده",creditLimit:"سقف اعتبار (بدهی مجاز)"},
   PR:{perGB:"هر گیگ (فروش)",perDay:"هر روز (فروش)",addGB:"هر گیگ (افزایش/تمدید)",addDay:"هر روز (افزایش/تمدید)",discount:"تخفیف ٪"}},
- en:{wallet:"Wallet",customers:"Customers",subagents:"Sub-agents",reports:"Reports",profile:"Profile",agents:"Agencies",agency:"Sales & agency",
+ en:{frozen:"accounts suspended",freeze:"Suspend accounts",unfreeze:"Resume accounts",freezeq:"Disconnect and suspend every account of this agency (and its sub-agents)? The agency cannot switch them back on.",unfreezeq:"Resume this agency's accounts?",frozenmsg:"All your accounts are suspended by the management. Settle your account to resume.",wallet:"Wallet",customers:"Customers",subagents:"Sub-agents",reports:"Reports",profile:"Profile",agents:"Agencies",agency:"Sales & agency",
   balance:"Balance",credit:"Credit limit",sell:"Sell account",renew:"Renew",plan:"Plan",custom:"Custom",price:"Price",services:"Services",customer:"Customer",nocust:"— no customer —",
   gb:"Quota (GB)",days:"Days",hours:"Hours",devices:"Devices",note:"Note",created:"Created",fresh:"New period (usage back to 0, quota = plan quota)",
   quote:"Cost",willpay:"taken from the wallet",after:"Balance after",newagent:"New agency",parent:"Parent",admin:"Admin",brand:"Brand",title:"Title",
@@ -146,6 +146,7 @@ function agBulkCreate(after){(async()=>{await loadPlans();
    const txt=(j.obj||[]).map(x=>x.User+"\t"+x.Pass).join("\n");const m2=modal(t("created")+" ("+(j.obj||[]).length+")",h("pre",{},txt),[copyBtn(txt),h("button",{class:"btn p",onclick:()=>{m2.remove();after&&after()}},"OK")])}},t("save"))])})()}
 
 /* ---------- agents (admin: all; reseller: its sub-agents) ---------- */
+async function enter(a){await post("panel/agency/agents/"+a.id+"/login");location.hash="#/accounts";location.reload()}
 async function pAgents(c){await Promise.all([loadAgents(),loadPlans()]);let qs="";
  const body=h("div");
  const draw=()=>{const list=AGENTS.filter(a=>!qs||(a.username+" "+(a.brand||"")+" "+(a.phone||"")+" "+(a.title||"")).toLowerCase().includes(qs));
@@ -154,17 +155,19 @@ async function pAgents(c){await Promise.all([loadAgents(),loadPlans()]);let qs="
   let sum=0,debt=0;AGENTS.forEach(a=>{sum+=a.balance;if(a.balance<0)debt+=a.balance});
   put(body,h("div",{class:"dg"},stat("🤝","#6366f1",X("agents"),fnum(AGENTS.length)),stat("💰","#10b981",X("totalbal"),money(sum)),stat("📉","#ef4444",X("totaldebt"),money(debt))),
    tbl([t("name"),X("status"),X("balance"),X("accts"),t("online"),X("sales30"),X("lastsale"),""],ordered.map(([a,d])=>h("tr",{},
-    h("td",{},h("div",{style:"padding-inline-start:"+(d*18)+"px"},d?h("span",{class:"mu"},"↳ "):null,h("b",{},a.username),a.brand?h("span",{class:"mu"}," "+a.brand):null),
+    h("td",{},h("div",{style:"padding-inline-start:"+(d*18)+"px"},d?h("span",{class:"mu"},"↳ "):null,ME.role==="admin"?h("b",{style:"cursor:pointer;color:var(--pr)",title:X("loginas"),onclick:()=>enter(a)},a.username):h("b",{},a.username),a.brand?h("span",{class:"mu"}," "+a.brand):null),
      h("div",{class:"mu",style:"font-size:11px;padding-inline-start:"+(d*18)+"px"},X("level")+" "+fnum(a.level)+(a.parentName?" · "+X("parent")+": "+a.parentName:"")+(a.phone?" · "+a.phone:""))),
-    h("td",{},h("span",{class:"pill "+(a.status==="active"?"active":a.status==="disabled"?"disabled":"expired")},X("st")[a.status]||a.status),a.banReason?h("div",{class:"mu",style:"font-size:11px"},a.banReason):null),
+    h("td",{},h("span",{class:"pill "+(a.status==="active"?"active":a.status==="disabled"?"disabled":"expired")},X("st")[a.status]||a.status),a.frozen?h("div",{},h("span",{class:"pill expired",title:a.frozenNote||""},"⛔ "+X("frozen"))):null,a.banReason?h("div",{class:"mu",style:"font-size:11px"},a.banReason):null),
     h("td",{},h("b",{class:"num",style:"color:"+color(a.balance)},money(a.balance))),
-    h("td",{},h("span",{class:"num"},fnum(a.active)+" / "+fnum(a.accounts))),h("td",{},fnum(a.online)),
+    h("td",{},h("span",{class:"num"},fnum(a.active)+" / "+fnum(a.accounts)),h("div",{class:"mu num",style:"font-size:11px"},fmtB(a.used))),h("td",{},fnum(a.online)),
     h("td",{},h("div",{class:"num"},fnum(a.salesMonth)),h("div",{class:"mu num",style:"font-size:11px"},money(a.paidMonth))),
     h("td",{class:"mu"},a.lastSale?ago(a.lastSale):t("never")),
     h("td",{class:"ops"},ib("✎",t("edit"),()=>agentModal(a,reload)),ib("💰",X("wallet"),()=>walletModal(a,reload)),ib("📒",X("ledger"),()=>ledgerModal(a)),
      ib("🔎",t("accounts"),()=>{AS.owner=String(a.id);AS.page=1;AS.q="";AS.status="";go("accounts")}),
      a.status==="banned"?ib("✅",X("unban"),async()=>{await post("panel/agency/agents/"+a.id+"/ban",{until:0});reload()}):ib("⛔",X("ban"),()=>banModal(a,reload)),
-     ME.role==="admin"?ib("👁",X("loginas"),async()=>{if(!confirm(X("loginas")+": "+a.username+"?"))return;await post("panel/agency/agents/"+a.id+"/login");location.hash="#/dash";location.reload()}):null,
+     a.frozen?ib("▶",X("unfreeze"),async()=>{if(!confirm(X("unfreezeq")+"\n"+a.username))return;await post("panel/agency/agents/"+a.id+"/freeze",{on:false});toast(t("saved"));reload()})
+      :ib("⏸",X("freeze"),async()=>{const note=prompt(X("freezeq")+"\n"+a.username+"\n\n"+X("note")+":","");if(note===null)return;await post("panel/agency/agents/"+a.id+"/freeze",{on:true,note});toast(t("saved"));reload()},"d"),
+     ME.role==="admin"?ib("👁",X("loginas"),()=>enter(a)):null,
      ME.role==="admin"?ib("↪",X("move"),()=>agentMoveModal(a,reload)):null,
      ib("🗑",t("del"),async()=>{if(!confirm(t("confirm")+"\n"+a.username))return;await post("panel/agency/agents/"+a.id+"/delete");reload()},"d"))))))};
  const reload=async()=>{await loadAgents();draw()};
@@ -285,9 +288,10 @@ async function pAgDash(c){
    h("button",{class:"btn",onclick:()=>go("accounts")},"👥 "+t("accounts")),h("button",{class:"btn",onclick:()=>go("wallet")},"💰 "+X("wallet")),h("button",{class:"btn",onclick:()=>go("reports")},"📈 "+X("reports")));
   const acctRow=x=>h("tr",{},h("td",{},h("b",{},x.email)),h("td",{class:"num"},fmtB(x.used)+" / "+(x.total?fmtB(x.total):"∞")),h("td",{},leftText(x.expiry)),
    h("td",{},ME.agent.perms.renew?h("button",{class:"btn s p",onclick:()=>renewModal([x.email],draw)},X("renew")):null));
-  put(c,h("div",{class:"top"},h("h2",{},t("dash")),h("span",{class:"mu"},ME.agent.title||"")),quick,
+  put(c,h("div",{class:"top"},h("h2",{},t("dash")),h("span",{class:"mu"},ME.agent.title||"")),
+   d.frozen?h("div",{class:"card",style:"margin-bottom:12px;border-color:var(--er);color:var(--er)"},"⛔ "+X("frozenmsg")):null,quick,
    h("div",{class:"dg"},stat("💰",d.balance<0?"#ef4444":"#10b981",X("balance"),money(d.balance),X("credit")+": "+money(d.creditLimit)),
-    stat("👥","#6366f1",X("ownacc"),fnum(d.accounts.own),d.accounts.subtree?X("subacc")+": "+fnum(d.accounts.subtree):null),stat("🌐","#10b981",t("online"),fnum(d.accounts.online)),
+    stat("👥","#6366f1",X("ownacc"),fnum(d.accounts.own),d.accounts.subtree?X("subacc")+": "+fnum(d.accounts.subtree):null),stat("🌐","#10b981",t("online"),fnum(d.accounts.online),t("traffic")+": "+fmtB(d.accounts.used||0)),
     stat("✅","#3b82f6",t("active"),fnum(st.active||0)),stat("📅","#ef4444",t("expired")+" / "+t("depleted"),fnum((st.expired||0)+(st.depleted||0))),stat("🚫","#f59e0b",t("disabled"),fnum(st.disabled||0)),
     stat("🛒","#6366f1",X("today"),fnum((s0("today").sales||0)+(s0("today").renews||0)),money(s0("today").paid||0)),stat("🗓","#06b6d4",X("d7"),fnum((s0("week").sales||0)+(s0("week").renews||0)),money(s0("week").paid||0)),
     stat("📆","#8b5cf6",X("d30"),fnum((s0("month").sales||0)+(s0("month").renews||0)),money(s0("month").paid||0)),d.children?stat("📈","#f59e0b",X("profit")+" (30d)",money(s0("month").profit||0)):null),
