@@ -37,37 +37,44 @@ func fail(w http.ResponseWriter, msg string)        { writeJSON(w, envelope{fals
 func (a *API) Handler() http.Handler {
 	mux := http.NewServeMux()
 	p := "/panel/api/inbounds"
-	g := func(path string, h http.HandlerFunc) { mux.HandleFunc("GET "+p+path, a.api(h)) }
-	po := func(path string, h http.HandlerFunc) { mux.HandleFunc("POST "+p+path, a.api(h)) }
+	// admin-only routes (a reseller gets "not available"); ag(...) routes serve resellers too,
+	// with the reseller version of the handler when the caller is one
+	g := func(path string, h http.HandlerFunc) { mux.HandleFunc("GET "+p+path, a.api(h, nil)) }
+	po := func(path string, h http.HandlerFunc) { mux.HandleFunc("POST "+p+path, a.api(h, nil)) }
+	ga := func(path string, h, agent http.HandlerFunc) { mux.HandleFunc("GET "+p+path, a.api(h, agent)) }
+	pa := func(path string, h, agent http.HandlerFunc) { mux.HandleFunc("POST "+p+path, a.api(h, agent)) }
 
 	mux.HandleFunc("POST /login", a.login)
 	mux.HandleFunc("GET /logout", a.logout)
 	mux.HandleFunc("GET /{$}", a.page)
+	mux.HandleFunc("GET /agency.js", a.agencyJS)
 
-	g("/list", a.list)
-	g("/get/{id}", a.get)
-	g("/getClientTraffics/{email}", a.clientTraffic)
-	g("/getClientTrafficsById/{id}", a.clientTraffic)
-	g("/resellerBalance", func(w http.ResponseWriter, r *http.Request) { fail(w, "not a reseller") })
-	g("/{id}/ovpn/{proto}", a.ovpnFile)
+	ga("/list", a.list, a.agList)
+	ga("/get/{id}", a.get, a.agGet)
+	ga("/getClientTraffics/{email}", a.clientTraffic, a.agClientTraffic)
+	ga("/getClientTrafficsById/{id}", a.clientTraffic, a.agClientTraffic)
+	ga("/resellerBalance", a.adminBalance, a.agBalance)
+	ga("/{id}/ovpn/{proto}", a.ovpnFile, a.agOvpn)
 	g("/pools", a.pools)
 
 	po("/add", a.addInbound)
 	po("/update/{id}", a.updateInbound)
 	po("/del/{id}", a.delInbound)
-	po("/addClient", a.addClient)
-	po("/updateClient/{clientId}", a.updateClient)
-	po("/{id}/delClient/{clientId}", a.delClient)
-	po("/{id}/delClientByEmail/{email}", a.delClient)
-	po("/{id}/resetClientTraffic/{email}", a.resetTraffic)
+	pa("/addClient", a.addClient, a.agAddClient)
+	pa("/updateClient/{clientId}", a.updateClient, a.agUpdateClient)
+	pa("/{id}/delClient/{clientId}", a.delClient, a.agDelClient)
+	pa("/{id}/delClientByEmail/{email}", a.delClient, a.agDelClient)
+	pa("/{id}/resetClientTraffic/{email}", a.resetTraffic, a.agResetTraffic)
 	po("/resetAllClientTraffics/{id}", a.resetAll)
 	po("/resetAllTraffics", a.resetAll)
-	po("/delDepletedClients/{id}", a.delDepleted)
+	pa("/delDepletedClients/{id}", a.delDepleted, a.agDelDepleted)
 	po("/updateClientTraffic/{email}", a.setTraffic)
-	po("/clientIps/{email}", a.clientIps)
-	po("/clearClientIps/{email}", func(w http.ResponseWriter, r *http.Request) { ok(w, "", nil) })
-	po("/onlines", a.onlines)
-	po("/lastOnline", a.lastOnline)
+	pa("/clientIps/{email}", a.clientIps, a.agClientIps)
+	pa("/clearClientIps/{email}", func(w http.ResponseWriter, r *http.Request) { ok(w, "", nil) }, func(w http.ResponseWriter, r *http.Request) { ok(w, "", nil) })
+	pa("/onlines", a.onlines, a.agOnlines)
+	pa("/lastOnline", a.lastOnline, a.agLastOnline)
+
+	a.agencyRoutes(mux)
 
 	a.uiRoutes(mux)
 
@@ -79,14 +86,28 @@ func (a *API) Handler() http.Handler {
 }
 
 // api guards a handler: no cookie => bare 404 (hides the endpoints, like the old panel).
-func (a *API) api(h http.HandlerFunc) http.HandlerFunc {
+// A reseller (cookie or API key) gets agent, or "not available" when the route has none.
+func (a *API) api(h, agent http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !a.st.loggedIn(r) {
-			http.NotFound(w, r)
+		id, via, ok := a.identify(w, r)
+		if !ok {
+			if via != "handled" {
+				http.NotFound(w, r)
+			}
 			return
 		}
 		r.ParseForm()
-		h(w, r)
+		if id == 0 {
+			h(w, r)
+			return
+		}
+		r = withAgent(r, id, via)
+		if agent == nil {
+			w.WriteHeader(http.StatusForbidden)
+			writeJSON(w, envelope{false, "this action is not available to agencies", nil})
+			return
+		}
+		agent(w, r)
 	}
 }
 
@@ -101,6 +122,18 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !a.st.CheckAdmin(r.PostFormValue("username"), r.PostFormValue("password")) {
+		if Ag != nil {
+			if ag, why := Ag.Authenticate(r.PostFormValue("username"), r.PostFormValue("password")); ag != nil {
+				a.st.issueAgent(w, ag.ID, ag.TokenVer, r.TLS != nil)
+				Ag.Log("agent:"+itoa(ag.ID), "login", "", ip, "%s", r.UserAgent())
+				ok(w, "Login successful", nil)
+				return
+			} else if why != "Wrong username or password" {
+				loginFailed(ip)
+				fail(w, why)
+				return
+			}
+		}
 		loginFailed(ip)
 		Events.Add("login-fail", "panel", r.PostFormValue("username"), "from %s", ip)
 		a.st.NotifyLogin(false, r.PostFormValue("username"), ip)
@@ -401,7 +434,8 @@ func (a *API) addClient(w http.ResponseWriter, r *http.Request) {
 	}
 	acc := &Account{Email: email, Username: user, Password: c.Password, SubID: c.SubID, Enable: c.Enable,
 		TotalGB: c.TotalGB, ExpiryTime: c.ExpiryTime, LimitIP: c.LimitIP, TgID: c.TgID, Comment: c.Comment,
-		Reset: c.Reset, SpeedDown: c.SpeedDown, SpeedUp: c.SpeedUp, SingleProto: single, Inbounds: ids, CreatedAt: nowMs()}
+		Reset: c.Reset, SpeedDown: c.SpeedDown, SpeedUp: c.SpeedUp, SingleProto: single, Inbounds: ids, CreatedAt: nowMs(),
+		Owner: agentOf(r), Customer: customerOf(r)}
 	a.st.st.Accounts[ekey(email)] = acc
 	a.st.touch()
 	a.st.mu.Unlock()

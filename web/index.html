@@ -67,7 +67,7 @@ const T = {
   chpw:"Change password",domreq:"Connection domain is required for Cisco (the SSL certificate is issued for it)",certwait:"Getting the SSL certificate...",certget:"SSL certificate for",certsave:"✓ Save the service",certsaveanyway:"Save anyway (self-signed certificate)",back:"Back",bk:"Backup & restore",tgb:"Automatic backup to Telegram",tgbhelp:"Create a bot with @BotFather, send it any message, then enter its token and your numeric chat id. The panel sends the backup file every N hours (0 = off). Use a bot of your own, not the sales bot.",tgtoken:"Bot token",tgchat:"Chat id (your numeric id)",tghours:"Send every (hours, 0 = off)",tgnow:"Send a backup now",tglogin:"Message me on every panel login",tgcpu:"CPU alert above % (0 = off)",tgsent:"Backup sent to Telegram",bkhelp:"Download everything (services, accounts, usage) as one file, or restore it on this or another server. Panel login/port/certificate are kept.",restore:"Restore from file",restoreconf:"Replace ALL current accounts and services with the ones in this file?",imp:"Import from old panel (vpn-ui)",imphelp:"Moves services and accounts directly from a running vpn-ui panel. The old panel is only read, never changed.",impurl:"Old panel address (with base path)",pass:"Password",shift:"Add to every port (to run side by side)",impen:"Create services enabled",impreq:"Address, username and password are required",impgo:"Import now",oldpw:"Current password",newpw:"New password (8+)",backup:"Download backup",restart:"Restart panel",tls:"HTTPS certificate path",tlsk:"HTTPS key path",
   basep:"Base path",adv:"Advanced settings (JSON)",lang:"فارسی",theme:"Theme",logout:"Sign out",sort:"Sort",name:"Name",lastseen:"Last seen",today:"Used today",dns:"DNS",mtu:"MTU",
   portudp:"OpenVPN UDP port",porttcp:"OpenVPN TCP port",useudp:"UDP enabled",usetcp:"TCP enabled",portoc:"Cisco port (TCP + UDP)",portl2:"L2TP port",ipsecon:"IPsec enabled (phones)",condom:"Connection domain/IP (given to clients)",psk:"IPsec pre-shared key",pskreq:"Enter the IPsec pre-shared key (or turn IPsec off)",ipsec:"IPsec PSK (phones)",pool:"Tunnel pool",udp:"UDP",tcp:"TCP",tcpport:"TCP port",ext:"Server address for clients",sub:"Config",listen:"Listen address",
-  full:"Device limit reached",none:"Nothing here yet",single:"One protocol at a time",singleh:"The account is served on all selected protocols, but can be connected through only one of them at a time.",defsingle:"Default for accounts created by the bot / API"},
+  full:"Device limit reached",none:"Nothing here yet",single:"One protocol at a time",singleh:"The account is served on all selected protocols, but can be connected through only one of them at a time.",defsingle:"Default for accounts created by the bot / API",allowners:"All owners",adminown:"Admin's own"},
  fa:{dash:"داشبورد",accounts:"اکانت‌ها",inbounds:"سرویس‌ها",online:"آنلاین",logs:"لاگ",settings:"تنظیمات",login:"ورود",user:"نام کاربری",pass:"رمز",
   add:"افزودن اکانت",bulkc:"ساخت گروهی",search:"جستجو…",all:"همه",active:"فعال",expired:"منقضی",depleted:"تمام‌شده",disabled:"غیرفعال",save:"ذخیره",cancel:"انصراف",
   del:"حذف",edit:"ویرایش",reset:"ریست حجم",kick:"قطع",enable:"فعال",disable:"غیرفعال",extend:"تمدید",used:"مصرف کل (از ابتدا)",expiry:"انقضا",devices:"دستگاه",speed:"سرعت",
@@ -79,7 +79,7 @@ const T = {
   chpw:"تغییر رمز",domreq:"برای Cisco دامنه اتصال اجباری است (گواهی SSL برای آن گرفته می‌شود)",certwait:"در حال گرفتن گواهی SSL...",certget:"گواهی SSL برای",certsave:"✓ ذخیره سرویس",certsaveanyway:"با این حال ذخیره کن (گواهی خودامضا)",back:"برگشت",bk:"بکاپ و بازیابی",tgb:"بکاپ خودکار در تلگرام",tgbhelp:"با @BotFather یک ربات بساز، یک پیام برایش بفرست، بعد توکن آن و آیدی عددی خودت را وارد کن. پنل هر N ساعت فایل بکاپ را می‌فرستد (۰ = خاموش). یک ربات جدا بساز، نه ربات فروش.",tgtoken:"توکن ربات",tgchat:"آیدی چت (آیدی عددی خودت)",tghours:"ارسال هر چند ساعت (۰ = خاموش)",tgnow:"همین حالا بکاپ بفرست",tglogin:"با هر ورود به پنل برایم پیام بفرست",tgcpu:"هشدار مصرف CPU بالای ٪ (۰ = خاموش)",tgsent:"بکاپ در تلگرام ارسال شد",bkhelp:"همه‌چیز (سرویس‌ها، اکانت‌ها، مصرف) را در یک فایل دانلود کن، یا روی همین سرور یا سرور دیگر بازیابی کن. یوزر/پورت/گواهی پنل عوض نمی‌شود.",restore:"بازیابی از فایل",restoreconf:"همه اکانت‌ها و سرویس‌های فعلی با محتوای این فایل جایگزین شوند؟",imp:"انتقال از پنل قدیمی (vpn-ui)",imphelp:"سرویس‌ها و اکانت‌ها را مستقیم از یک پنل vpn-ui در حال اجرا می‌آورد. پنل قدیمی فقط خوانده می‌شود و تغییری نمی‌کند.",impurl:"آدرس پنل قدیمی (با مسیر پایه)",pass:"رمز",shift:"اضافه شدن به هر پورت (برای اجرای هم‌زمان)",impen:"سرویس‌ها فعال ساخته شوند",impreq:"آدرس، یوزر و رمز لازم است",impgo:"انتقال بده",oldpw:"رمز فعلی",newpw:"رمز جدید (حداقل ۸)",backup:"دانلود بکاپ",restart:"ری‌استارت پنل",tls:"مسیر گواهی HTTPS",tlsk:"مسیر کلید HTTPS",
   basep:"مسیر پایه",adv:"تنظیمات پیشرفته (JSON)",lang:"English",theme:"تم",logout:"خروج",sort:"مرتب‌سازی",name:"نام",lastseen:"آخرین اتصال",today:"مصرف امروز",dns:"DNS",mtu:"MTU",
   portudp:"پورت UDP اوپن‌وی‌پی‌ان",porttcp:"پورت TCP اوپن‌وی‌پی‌ان",useudp:"UDP فعال",usetcp:"TCP فعال",portoc:"پورت سیسکو (TCP و UDP)",portl2:"پورت L2TP",ipsecon:"IPsec فعال (گوشی)",condom:"دامنه/آی‌پی اتصال (به کاربر داده می‌شود)",psk:"کلید IPsec (pre-shared key)",pskreq:"کلید IPsec رو وارد کن (یا IPsec رو خاموش کن)",ipsec:"کلید IPsec (گوشی)",pool:"محدوده تونل",udp:"UDP",tcp:"TCP",tcpport:"پورت TCP",ext:"آدرس سرور برای کاربران",sub:"کانفیگ",listen:"آدرس شنود",
-  full:"سقف دستگاه پر است",none:"چیزی نیست",single:"فقط با یک پروتکل همزمان",singleh:"اکانت روی همه‌ی پروتکل‌های انتخاب‌شده فعال است ولی هر لحظه فقط با یکی از آن‌ها می‌شود وصل بود.",defsingle:"پیش‌فرض برای اکانت‌هایی که ربات / API می‌سازد"}
+  full:"سقف دستگاه پر است",none:"چیزی نیست",single:"فقط با یک پروتکل همزمان",singleh:"اکانت روی همه‌ی پروتکل‌های انتخاب‌شده فعال است ولی هر لحظه فقط با یکی از آن‌ها می‌شود وصل بود.",defsingle:"پیش‌فرض برای اکانت‌هایی که ربات / API می‌سازد",allowners:"همه (مدیر و نمایندگان)",adminown:"اکانت‌های خود مدیر"}
 };
 let lang = localStorage.getItem("lang") || "fa", theme = localStorage.getItem("theme") || "light";
 const t = k => (T[lang] && T[lang][k]) || T.en[k] || k;
@@ -148,7 +148,12 @@ function expiryEditor(init){let exp=init||0;const HR=36e5;
  return{el,value:()=>exp}}
 
 let page="dash",timer=null,inboundsCache=[],booted=false;
-const hashPage=()=>{const k=decodeURIComponent(location.hash.replace(/^#\/?/,"")).split("?")[0];return ["dash","accounts","inbounds","online","logs","settings"].includes(k)?k:"dash"};
+// ME is who is logged in (whoami of the agency module): role "admin" or "agent". agency.js adds
+// the agency pages and replaces the admin pages an agency must not see.
+let ME={role:"admin"},AGN={};
+let PAGES=["dash","accounts","inbounds","online","logs","settings"];const ICON={dash:"📊",accounts:"👥",inbounds:"🔌",online:"🟢",logs:"📜",settings:"⚙️"};
+const PAGEFN={dash:pDash,accounts:pAccounts,inbounds:pInbounds,online:pOnline,logs:pLogs,settings:pSettings};
+const hashPage=()=>{const k=decodeURIComponent(location.hash.replace(/^#\/?/,"")).split("?")[0];return PAGES.includes(k)?k:PAGES[0]};
 page=hashPage();
 function go(k){if(hashPage()===k&&location.hash){page=k;render()}else location.hash="#/"+k}
 addEventListener("hashchange",()=>{const k=hashPage();if(booted&&k!==page){page=k;render()}});
@@ -158,16 +163,15 @@ function showLogin(){clearInterval(timer);const u=h("input",{placeholder:t("user
  p.addEventListener("keydown",e=>e.key==="Enter"&&go());
  document.body.classList.add("lg");$root.replaceChildren(h("div",{class:"login card"},h("div",{class:"lo"},"🛡️"),h("h2",{},"VPN Lite"),h("p",{},"Panel"),u,p,h("button",{class:"btn p",style:"width:100%",onclick:go},t("login"))))}
 
-const PAGES=["dash","accounts","inbounds","online","logs","settings"];const ICON={dash:"📊",accounts:"👥",inbounds:"🔌",online:"🟢",logs:"📜",settings:"⚙️"};
 function shell(content){
  const nav=PAGES.map(k=>h("a",{class:k===page?"on":"",onclick:()=>go(k)},h("b",{},ICON[k]),t(k)));
- return h("div",{class:"app"},h("div",{class:"side"},h("h1",{},h("i",{},"🛡️"),"VPN Lite"),nav,h("hr"),
+ return h("div",{class:"app"},h("div",{class:"side"},h("h1",{},h("i",{},"🛡️"),ME.role==="agent"?(ME.agent.brand||ME.agent.username):"VPN Lite"),window.sideTop?sideTop():null,nav,h("hr"),
   h("a",{onclick:()=>{lang=lang==="fa"?"en":"fa";localStorage.setItem("lang",lang);applyLook();render()}},t("lang")),
   h("a",{onclick:()=>{theme=theme==="dark"?"light":"dark";localStorage.setItem("theme",theme);applyLook()}},t("theme")),
-  h("a",{onclick:async()=>{await fetch(BASE+"logout");showLogin()}},t("logout"))),
-  h("div",{class:"main"},h("div",{class:"mob"},PAGES.map(k=>h("a",{class:k===page?"on":"",onclick:()=>go(k)},t(k)))),content))}
+  h("a",{onclick:async()=>{await fetch(BASE+"logout");ME={role:"admin"};showLogin()}},t("logout"))),
+  h("div",{class:"main"},window.shellTop?shellTop():null,h("div",{class:"mob"},PAGES.map(k=>h("a",{class:k===page?"on":"",onclick:()=>go(k)},t(k)))),content))}
 async function render(){document.body.classList.remove("lg");clearInterval(timer);const c=h("div");$root.replaceChildren(shell(c));
- const fn={dash:pDash,accounts:pAccounts,inbounds:pInbounds,online:pOnline,logs:pLogs,settings:pSettings}[page];
+ const fn=PAGEFN[page]||PAGEFN[PAGES[0]];
  try{await fn(c)}catch(e){if(e.message!=="auth")console.error(e)}}
 function auto(fn,ms){clearInterval(timer);timer=setInterval(()=>{if(!document.hidden)fn().catch(()=>{})},ms)}
 
@@ -178,7 +182,7 @@ async function doUpdate(){const j=await api("panel/ui/updateCheck");if(!j.succes
  if(!confirm(t("updq")+" "+o.current+" → "+o.latest+" ?"))return;
  toast(t("updating"));const r=await api("panel/ui/update",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
  if(!r.success){toast(r.msg||"error",1);return}toast(r.msg);setTimeout(()=>location.reload(),5000)}
-async function pDash(c){
+async function pDash(c){let agx=null;if(window.dashExtra)dashExtra().then(e=>{agx=e;if(e&&page==="dash"&&c.firstChild)c.firstChild.after(e)});
  const draw=async()=>{const s=await call("panel/ui/summary");const st=s.status||{};inboundsCache=s.inbounds;
   const sy=s.sys,pc=n=>Math.max(0,Math.min(100,n||0));
   const jump=(pg,st)=>()=>{if(pg==="accounts"){AS.status=st||"";AS.q="";AS.inbound="";AS.page=1;AS.sel.clear()}go(pg)};
@@ -186,7 +190,7 @@ async function pDash(c){
   const big=v=>h("div",{class:"dv num"},v);
   const meter=(p,left,right)=>h("div",{},h("div",{class:"dm"},h("span",{},left),h("b",{class:"num"},Math.round(p)+"%")),h("div",{class:"bar"+(p>90?" hi":"")},h("i",{style:"width:"+pc(p)+"%"})),right?h("div",{class:"mu num",style:"margin-top:4px;font-size:11px"},right):null);
   const two=(a,b)=>h("div",{class:"d2"},h("span",{class:"num"},"⬆ "+a),h("span",{class:"num"},"⬇ "+b));
-  c.replaceChildren(h("div",{class:"top"},h("h2",{},t("dash"))),
+  c.replaceChildren(h("div",{class:"top"},h("h2",{},t("dash"))),agx||"",
    h("div",{class:"dg"},
     box("👥","#6366f1",t("accounts"),big(s.accounts),jump("accounts","")),box("🌐","#10b981",t("onlineu"),big(s.onlineUsers),jump("online")),box("✅","#3b82f6",t("active"),big(st.active||0),jump("accounts","active")),
     box("🚫","#f59e0b",t("disabled"),big(st.disabled||0),jump("accounts","disabled")),box("📦","#ef4444",t("depleted"),big(st.depleted||0),jump("accounts","depleted")),box("📅","#ef4444",t("expired"),big(st.expired||0),jump("accounts","expired")),
@@ -207,18 +211,21 @@ async function pDash(c){
 
 /* ---------- accounts ---------- */
 const ib=(ic,label,fn,cls)=>h("button",{class:"ib"+(cls?" "+cls:""),title:label,onclick:fn},h("span",{class:"ic"},ic),h("span",{class:"lb"},label));
-const AS={q:"",status:"",inbound:"",sort:"name",page:1,size:50,sel:new Set()};
+const AS={q:"",status:"",inbound:"",owner:"",customer:"",sort:"name",page:1,size:50,sel:new Set()};
 async function pAccounts(c){
- if(!inboundsCache.length)inboundsCache=(await call("panel/ui/summary")).inbounds;
+ if(ME.role==="agent")inboundsCache=ME.services||[];else if(!inboundsCache.length)inboundsCache=(await call("panel/ui/summary")).inbounds;
  const body=h("div"),bulk=h("div");
  const q=h("input",{placeholder:t("search"),value:AS.q,oninput:e=>{AS.q=e.target.value;AS.page=1;clearTimeout(q._t);q._t=setTimeout(load,250)}});
  const sel=(opts,key)=>h("select",{onchange:e=>{AS[key]=e.target.value;AS.page=1;load()}},opts.map(([v,l])=>h("option",{value:v,selected:String(AS[key])===String(v)},l)));
- c.replaceChildren(h("div",{class:"top"},h("h2",{},t("accounts")),h("button",{class:"btn p",onclick:()=>accountModal()},"+ "+t("add")),h("button",{class:"btn",onclick:bulkCreateModal},t("bulkc")),h("button",{class:"btn d",onclick:()=>delExpired(load)},"🗑 "+t("delexp"))),
+ const topBtns=window.accTop?accTop(()=>load()):[h("button",{class:"btn p",onclick:()=>accountModal()},"+ "+t("add")),h("button",{class:"btn",onclick:bulkCreateModal},t("bulkc")),h("button",{class:"btn d",onclick:()=>delExpired(load)},"🗑 "+t("delexp"))];
+ const ownerSel=Object.keys(AGN).length?sel([["",t("allowners")],["0",t("adminown")],...Object.entries(AGN).map(([id,n])=>[id,"🏷 "+n])],"owner"):null;
+ c.replaceChildren(h("div",{class:"top"},h("h2",{},t("accounts")),topBtns),
   h("div",{class:"row"},q,sel([["",t("all")],["active",t("active")],["expired",t("expired")],["depleted",t("depleted")],["disabled",t("disabled")],["online",t("online")]],"status"),
-   sel([["",t("inbounds")],...inboundsCache.map(i=>[i.id,i.remark||i.protocol])],"inbound"),
+   sel([["",t("inbounds")],...inboundsCache.map(i=>[i.id,i.remark||i.protocol])],"inbound"),ownerSel,
    sel([["name",t("name")],["used",t("used")],["expiry",t("expiry")],["last",t("lastseen")]],"sort"),
    sel([[25,25],[50,50],[100,100],[200,200]],"size")),bulk,body);
- async function load(){const r=await call("panel/ui/accounts?"+new URLSearchParams({q:AS.q,status:AS.status,inbound:AS.inbound,sort:AS.sort,page:AS.page,size:AS.size}));
+ async function load(){const qp={q:AS.q,status:AS.status,inbound:AS.inbound,sort:AS.sort,page:AS.page,size:AS.size};if(AS.owner!=="")qp.owner=AS.owner;if(AS.customer)qp.customer=AS.customer;if(ME.role==="agent")qp.tree=1;
+  const r=await call("panel/ui/accounts?"+new URLSearchParams(qp));
   const names=Object.fromEntries(inboundsCache.map(i=>[i.id,i.remark||i.protocol]));
   const pages=Math.max(1,Math.ceil(r.total/r.size));
   const all=h("input",{type:"checkbox",onchange:e=>{r.items.forEach(a=>e.target.checked?AS.sel.add(a.email):AS.sel.delete(a.email));load()}});
@@ -232,7 +239,7 @@ async function pAccounts(c){
   body.replaceChildren(pager(),h("div",{class:"card sc"},r.items.length?h("table",{},h("tr",{},h("th",{},all),["name","protocols","used","expiry","speed","online","enable","status",""].map(k=>h("th",{},k?t(k==="name"?"name":k):""))),
    r.items.map(a=>{const pct=a.total?Math.min(100,(a.up+a.down)*100/a.total):0;
     return h("tr",{},h("td",{},h("input",{type:"checkbox",checked:AS.sel.has(a.email),onchange:e=>{e.target.checked?AS.sel.add(a.email):AS.sel.delete(a.email);drawBulk()}})),
-     h("td",{},h("b",{},a.email),a.comment?h("div",{class:"mu"},a.comment):null),
+     h("td",{},h("b",{},a.email),a.owner&&(ME.role==="admin"||a.owner!==ME.agent.id)?h("span",{class:"tag",style:"margin-inline-start:6px"},"🏷 "+(AGN[a.owner]||("#"+a.owner))):null,a.comment?h("div",{class:"mu"},a.comment):null),
      h("td",{},a.inbounds.map(i=>h("span",{class:"tag"},names[i]||i)),a.singleProto&&a.inbounds.length>1?h("span",{class:"tag",title:t("single")},"①"):null),
      h("td",{},h("div",{class:"num"},fmtB(a.up+a.down)+" / "+(a.total?fmtB(a.total):t("unl"))),a.total?h("div",{class:"bar"+(pct>90?" hi":"")},h("i",{style:"width:"+pct+"%"})):null),
      h("td",{},fmtExp(a.expiry)),
@@ -244,6 +251,7 @@ async function pAccounts(c){
       ib("🔗",t("link"),()=>infoModal(a)),
       ib("↺",t("resetshort"),async()=>{if(!confirm(t("resetq")+"\n"+a.email))return;await bulkOne("reset",a.email);toast(t("saved"));load()}),
       ib("⏏",t("kickshort"),async()=>{if(!a.online){toast(t("notonline"),1);return}const n=await post("panel/ui/kick?email="+encodeURIComponent(a.email));toast(n?t("kicked")+": "+n:t("notonline"),!n);if(n)setTimeout(load,700)},a.online?"":"off"),
+      window.accRowExtra?accRowExtra(a,()=>load()):null,
       ib("✎",t("edit"),()=>accountModal(a)),
       ib("🗑",t("del"),async()=>{if(!confirm(t("delq")+"\n"+a.email))return;await bulkOne("delete",a.email);toast(t("saved"));load()},"d")))
    })):h("div",{class:"mu"},t("none"))),
@@ -253,7 +261,7 @@ async function pAccounts(c){
   const days=h("input",{type:"number",value:30,style:"width:70px"}),gb=h("input",{type:"number",value:0,style:"width:70px"});
   bulk.replaceChildren(h("div",{class:"bar-sel"},AS.sel.size+" "+t("sel"),h("button",{class:"btn s",onclick:()=>act("enable")},t("enable")),h("button",{class:"btn s",onclick:()=>act("disable")},t("disable")),
    h("button",{class:"btn s",onclick:()=>act("reset")},t("reset")),days,"d",gb,"GB",h("button",{class:"btn s",onclick:()=>act("extend",{days:+days.value,gb:+gb.value})},t("extend")),
-   h("button",{class:"btn s d",onclick:()=>act("delete")},t("del")),h("button",{class:"btn s",onclick:()=>{AS.sel.clear();load()}},"✕")))}
+   h("button",{class:"btn s d",onclick:()=>act("delete")},t("del")),window.bulkExtra?bulkExtra([...AS.sel],()=>{AS.sel.clear();load()}):null,h("button",{class:"btn s",onclick:()=>{AS.sel.clear();load()}},"✕")))}
  await load();auto(load,15000)}
 
 function modal(title,content,actions){const m=h("div",{class:"modal",onclick:e=>e.target===m&&m.remove()},h("div",{class:"card"},h("h3",{style:"margin-top:0"},title),content,h("div",{class:"row",style:"margin:14px 0 0;justify-content:flex-end"},actions)));document.body.append(m);return m}
@@ -436,7 +444,11 @@ async function pSettings(c){const s=await call("panel/ui/settings");const g=s.gl
    h("button",{class:"btn",onclick:async()=>{try{await saveAll();await post("panel/ui/backupNow");toast(t("tgsent"))}catch(e){toast(e.message,1)}}},"📤 "+t("tgnow"))),
   h("div",{class:"card"},h("button",{class:"btn d",onclick:async()=>{if(!confirm(t("confirm")))return;await post("panel/ui/restart");toast("…");setTimeout(()=>location.reload(),3500)}},t("restart"))))}
 
-async function boot(){try{await call("panel/ui/summary");booted=true;if(!location.hash)history.replaceState(null,"","#/"+page);render()}catch(e){if(e.message!=="auth")console.error(e)}}
+function loadAgency(){return new Promise(res=>{const run=async()=>{try{if(window.agencySetup)await agencySetup()}catch(e){console.error(e)}res()};if(window.agencySetup)return run();
+ const s=document.createElement("script");s.src=BASE+"agency.js?v="+encodeURIComponent(ME.version||"");s.onload=run;s.onerror=()=>res();document.head.append(s)})}
+async function boot(){try{const j=await api("panel/agency/whoami");
+  if(j&&j.success){ME=j.obj;await loadAgency()}else{ME={role:"admin"};if(ME.role==="admin")await call("panel/ui/summary")}
+  booted=true;page=hashPage();if(!location.hash)history.replaceState(null,"","#/"+page);render()}catch(e){if(e.message!=="auth")console.error(e)}}
 boot();
 </script>
 </body>

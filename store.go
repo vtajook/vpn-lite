@@ -57,6 +57,8 @@ type Account struct {
 	LastReset   int64 `json:"lastReset"` // unix ms of the last periodic traffic reset
 	Inbounds    []int `json:"inbounds"`
 	CreatedAt   int64 `json:"createdAt"`
+	Owner       int   `json:"owner,omitempty"`    // reseller agent that sold it (0 = the admin)
+	Customer    int   `json:"customer,omitempty"` // reseller's customer record it belongs to
 }
 
 type Admin struct {

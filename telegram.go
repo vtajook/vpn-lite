@@ -18,10 +18,27 @@ import (
 // tgAPI is the Bot API base URL (a variable so tests can point it at a fake).
 var tgAPI = "https://api.telegram.org"
 
-// backupBytes returns a consistent copy of the state file.
+// backupBytes returns a consistent copy of the state file, with the agency data (agents,
+// wallets and their ledger) added under "agency".
 func (s *Store) backupBytes() ([]byte, error) {
 	s.Flush()
-	return os.ReadFile(s.path)
+	b, err := os.ReadFile(s.path)
+	if err != nil || Ag == nil {
+		return b, err
+	}
+	var m map[string]json.RawMessage
+	if json.Unmarshal(b, &m) != nil {
+		return b, nil
+	}
+	x, err := json.Marshal(Ag.Export())
+	if err != nil {
+		return b, nil
+	}
+	m["agency"] = x
+	if out, err := json.Marshal(m); err == nil {
+		return out, nil
+	}
+	return b, nil
 }
 
 // sendTelegramDocument uploads data as a file to a chat through the Bot API.
@@ -135,6 +152,24 @@ func (s *Store) TgNotify(text string) {
 		resp, err := (&http.Client{Timeout: 30 * time.Second}).PostForm(tgAPI+"/bot"+g.TgToken+"/sendMessage", body)
 		if err != nil {
 			Events.Add("error", "telegram", "", "%v", strings.ReplaceAll(err.Error(), g.TgToken, "***"))
+			return
+		}
+		resp.Body.Close()
+	}()
+}
+
+// TgSend sends a short text message to any chat through the panel's bot (agency notices).
+func (s *Store) TgSend(chat, text string) {
+	s.mu.RLock()
+	token := s.st.Global.TgToken
+	s.mu.RUnlock()
+	if token == "" || strings.TrimSpace(chat) == "" {
+		return
+	}
+	go func() {
+		resp, err := (&http.Client{Timeout: 30 * time.Second}).PostForm(tgAPI+"/bot"+token+"/sendMessage", url.Values{"chat_id": {chat}, "text": {text}})
+		if err != nil {
+			Events.Add("error", "telegram", "", "%v", strings.ReplaceAll(err.Error(), token, "***"))
 			return
 		}
 		resp.Body.Close()

@@ -156,6 +156,13 @@ func serve(args []string) error {
 		return fmt.Errorf("not set up yet: run `vpn-lite setup`")
 	}
 	Events.Open(filepath.Join(d.logs, "events.log"))
+	if ag, err := OpenAgency(filepath.Join(d.data, "agency")); err != nil {
+		log.Printf("agency module disabled: %v", err) // the VPN keeps working without it
+		Events.Add("error", "agency", "", "not available: %v", err)
+	} else {
+		Ag = ag
+		defer ag.Close()
+	}
 
 	var dm Daemons
 	var eng *Engine

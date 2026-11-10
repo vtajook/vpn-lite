@@ -80,6 +80,57 @@ func (s *Store) issue(w http.ResponseWriter, secure bool) {
 }
 
 func (s *Store) loggedIn(r *http.Request) bool {
+	id, ok := s.who(r)
+	return ok && id == 0
+}
+
+// Reseller sessions use their own token form, "A.<id>.<ver>.<exp>.<sig>", signed with the same
+// panel secret. The version is the agent's TokenVer, so a password change or a ban ends them.
+func (s *Store) signAgent(id, ver int, exp int64) string {
+	msg := "A." + strconv.Itoa(id) + "." + strconv.Itoa(ver) + "." + strconv.FormatInt(exp, 10)
+	s.mu.RLock()
+	m := hmac.New(sha256.New, []byte(s.st.Secret))
+	s.mu.RUnlock()
+	m.Write([]byte(msg))
+	return msg + "." + base64.RawURLEncoding.EncodeToString(m.Sum(nil))
+}
+
+func (s *Store) issueAgent(w http.ResponseWriter, id, ver int, secure bool) {
+	s.mu.RLock()
+	mins := s.st.Global.SessionMinutes
+	base := s.st.Global.BasePath
+	s.mu.RUnlock()
+	exp := time.Now().Add(time.Duration(mins) * time.Minute)
+	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: s.signAgent(id, ver, exp.Unix()), Path: base, Expires: exp,
+		HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
+}
+
+// who reports the caller of a request: (0, true) the admin, (id, true) a reseller agent whose
+// session is still valid, (_, false) nobody.
+func (s *Store) who(r *http.Request) (int, bool) {
 	c, err := r.Cookie(cookieName)
-	return err == nil && s.verify(c.Value)
+	if err != nil {
+		return 0, false
+	}
+	tok := c.Value
+	if !strings.HasPrefix(tok, "A.") {
+		return 0, s.verify(tok)
+	}
+	f := strings.Split(tok, ".")
+	if len(f) != 5 {
+		return 0, false
+	}
+	id, e1 := strconv.Atoi(f[1])
+	ver, e2 := strconv.Atoi(f[2])
+	exp, e3 := strconv.ParseInt(f[3], 10, 64)
+	if e1 != nil || e2 != nil || e3 != nil || id <= 0 || exp < time.Now().Unix() {
+		return 0, false
+	}
+	if !hmac.Equal([]byte(s.signAgent(id, ver, exp)), []byte(tok)) {
+		return 0, false
+	}
+	if Ag == nil || !Ag.SessionOK(id, ver) {
+		return 0, false
+	}
+	return id, true
 }

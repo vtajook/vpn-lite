@@ -112,6 +112,11 @@ func (s *Store) projectInboundLocked(in *Inbound, withClients bool) inboundJSON 
 }
 
 func (s *Store) viewInboundLocked(in *Inbound, withClients bool) inboundView {
+	return s.viewInboundLockedF(in, withClients, nil)
+}
+
+// viewInboundLockedF is viewInboundLocked listing only the accounts keep accepts (nil = all).
+func (s *Store) viewInboundLockedF(in *Inbound, withClients bool, keep func(*Account) bool) inboundView {
 	set := make(map[string]any, len(in.Settings)+1)
 	for k, v := range in.Settings {
 		set[k] = v
@@ -123,6 +128,9 @@ func (s *Store) viewInboundLocked(in *Inbound, withClients bool) inboundView {
 	clients := []clientJSON{}
 	if withClients {
 		for _, a := range s.membersLocked(in.ID) {
+			if keep != nil && !keep(a) {
+				continue
+			}
 			clients = append(clients, a.client())
 			t := a.traffic()
 			out.ClientStats = append(out.ClientStats, t)

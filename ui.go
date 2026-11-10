@@ -54,30 +54,47 @@ func (a *API) page(w http.ResponseWriter, r *http.Request) {
 }
 
 // ui guards the panel's own JSON endpoints: an honest 401 (the page needs to show the login form).
-func (a *API) ui(h http.HandlerFunc) http.HandlerFunc {
+// ui guards an admin page endpoint. Resellers get uiAgent's handler or "not available".
+func (a *API) ui(h http.HandlerFunc) http.HandlerFunc { return a.uiAgent(h, nil) }
+
+func (a *API) uiAgent(h, agent http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !a.st.loggedIn(r) {
-			w.WriteHeader(http.StatusUnauthorized)
-			writeJSON(w, envelope{false, "login required", nil})
+		id, via, ok := a.identify(w, r)
+		if !ok {
+			if via != "handled" {
+				w.WriteHeader(http.StatusUnauthorized)
+				writeJSON(w, envelope{false, "login required", nil})
+			}
 			return
 		}
 		r.ParseForm()
-		h(w, r)
+		if id == 0 {
+			h(w, r)
+			return
+		}
+		r = withAgent(r, id, via)
+		if agent == nil {
+			w.WriteHeader(http.StatusForbidden)
+			writeJSON(w, envelope{false, "this action is not available to agencies", nil})
+			return
+		}
+		agent(w, r)
 	}
 }
 
 func (a *API) uiRoutes(mux *http.ServeMux) {
 	u := func(m, p string, h http.HandlerFunc) { mux.HandleFunc(m+" /panel/ui"+p, a.ui(h)) }
 	u("GET", "/summary", a.uiSummary)
-	u("GET", "/accounts", a.uiAccounts)
-	u("POST", "/bulk", a.uiBulk)
-	u("POST", "/bulkCreate", a.uiBulkCreate)
-	u("GET", "/sessions", a.uiSessions)
-	u("POST", "/kick", a.uiKick)
+	ua := func(m, p string, h, agent http.HandlerFunc) { mux.HandleFunc(m+" /panel/ui"+p, a.uiAgent(h, agent)) }
+	ua("GET", "/accounts", a.uiAccounts, a.uiAccounts) // scoped to the reseller's own accounts inside
+	ua("POST", "/bulk", a.uiBulk, a.agBulk)
+	ua("POST", "/bulkCreate", a.uiBulkCreate, a.agBulkCreate)
+	ua("GET", "/sessions", a.uiSessions, a.uiSessions)
+	ua("POST", "/kick", a.uiKick, a.uiKick)
 	u("GET", "/events", a.uiEvents)
 	u("GET", "/settings", a.uiGetSettings)
 	u("POST", "/settings", a.uiSetSettings)
-	u("POST", "/password", a.uiPassword)
+	ua("POST", "/password", a.uiPassword, a.agPassword)
 	u("POST", "/certs/{id}", a.uiCerts)
 	u("POST", "/certIssue/{id}", a.uiCertIssue)
 	u("GET", "/certStatus/{id}", a.uiCertStatus)
@@ -115,6 +132,9 @@ type accountRow struct {
 	Online     int    `json:"online"`
 	LastOnline int64  `json:"lastOnline"`
 	Status     string `json:"status"`
+	Owner      int    `json:"owner"`
+	Customer   int    `json:"customer"`
+	Created    int64  `json:"created"`
 }
 
 func statusOf(a *Account, now int64) string {
@@ -152,9 +172,30 @@ func (a *API) uiAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 	on := onlineCounts()
 	now := nowMs()
+	me := agentOf(r)
+	owner, ownerSet := -1, r.Form.Get("owner") != ""
+	if ownerSet {
+		owner, _ = strconv.Atoi(r.Form.Get("owner"))
+	}
+	cust, _ := strconv.Atoi(r.Form.Get("customer"))
+	var sub map[int]bool
+	if me > 0 && r.Form.Get("tree") == "1" && Ag != nil { // a reseller may look at its sub-agents' accounts
+		Ag.mu.RLock()
+		sub = Ag.subtreeLocked(me)
+		Ag.mu.RUnlock()
+	}
 	a.st.mu.RLock()
 	rows := make([]accountRow, 0, 64)
 	for _, acc := range a.st.st.Accounts {
+		if me > 0 && acc.Owner != me && !sub[acc.Owner] {
+			continue
+		}
+		if ownerSet && acc.Owner != owner {
+			continue
+		}
+		if cust > 0 && acc.Customer != cust {
+			continue
+		}
 		st := statusOf(acc, now)
 		if inb > 0 && !hasInt(acc.Inbounds, inb) {
 			continue
@@ -178,7 +219,7 @@ func (a *API) uiAccounts(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, accountRow{Email: acc.Email, Username: acc.Username, Password: acc.Password, SubID: acc.SubID,
 			Inbounds: append([]int(nil), acc.Inbounds...), Enable: acc.Enable, Total: acc.TotalGB, Up: acc.Up, Down: acc.Down,
 			Expiry: acc.ExpiryTime, LimitIP: acc.LimitIP, SpeedDown: acc.SpeedDown, SpeedUp: acc.SpeedUp, Single: acc.SingleProto, Reset: acc.Reset,
-			Comment: acc.Comment, Online: o, LastOnline: acc.LastOnline, Status: st})
+			Comment: acc.Comment, Online: o, LastOnline: acc.LastOnline, Status: st, Owner: acc.Owner, Customer: acc.Customer, Created: acc.CreatedAt})
 	}
 	a.st.mu.RUnlock()
 	less := map[string]func(i, j int) bool{
@@ -271,13 +312,30 @@ func (a *API) uiSessions(w http.ResponseWriter, r *http.Request) {
 		Up, Down                     int64
 	}
 	out := []row{}
+	mine := a.ownedSet(r)
 	for _, s := range Sessions.Snapshot() {
+		if mine != nil && !mine[strings.ToLower(s.Email)] {
+			continue
+		}
 		out = append(out, row{s.ID, s.Email, s.Proto, s.SrcIP, s.VIP, s.InboundID, s.Start, s.Up, s.Down})
 	}
 	ok(w, "", out)
 }
 
 func (a *API) uiKick(w http.ResponseWriter, r *http.Request) {
+	mine := a.ownedSet(r)
+	if mine != nil { // a reseller may only disconnect its own accounts
+		e := r.Form.Get("email")
+		if id := r.Form.Get("id"); id != "" {
+			if s := Sessions.Get(id); s != nil {
+				e = s.Email
+			}
+		}
+		if !mine[strings.ToLower(e)] {
+			fail(w, "session not found")
+			return
+		}
+	}
 	if id := r.Form.Get("id"); id != "" {
 		if s := Sessions.Get(id); s != nil && s.Kill != nil {
 			s.Kill()
@@ -572,10 +630,13 @@ func (a *API) uiCerts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) uiBackup(w http.ResponseWriter, r *http.Request) {
-	a.st.Flush()
+	b, err := a.st.backupBytes()
+	if err != nil {
+		fail(w, err.Error())
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="vpn-lite-%s.json"`, time.Now().Format("20060102-1504")))
-	b, _ := os.ReadFile(a.st.path)
 	w.Write(b)
 }
 
@@ -683,8 +744,9 @@ func readSys() sysInfo {
 				continue
 			}
 			name := strings.TrimSpace(l[:i])
-			if name == "lo" || strings.HasPrefix(name, "vl") || strings.HasPrefix(name, "ppp") || strings.HasPrefix(name, "vc") ||
-				strings.HasPrefix(name, "docker") || strings.HasPrefix(name, "veth") {
+			if name == "lo" || hasAnyPrefix(name, "vl", "ppp", "vc", "docker", "veth", "br-", "virbr",
+				// tunnels to other servers carry traffic that already passed the real interface once
+				"gre", "gretap", "erspan", "tun", "tap", "sit", "ip6tnl", "ip6gre", "ipip", "wg", "vti", "ip_vti", "xfrm") {
 				continue
 			}
 			fs := strings.Fields(l[i+1:])
@@ -704,6 +766,15 @@ func readSys() sysInfo {
 	lastRx, lastTx, lastNet = rx, tx, now
 	lastSys = s
 	return s
+}
+
+func hasAnyPrefix(s string, ps ...string) bool {
+	for _, p := range ps {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // l2tpPSK returns the IPsec pre-shared key shown to customers (empty when IPsec is off or not L2TP).
@@ -735,6 +806,12 @@ func (a *API) uiRestore(w http.ResponseWriter, r *http.Request) {
 	} else if json.Unmarshal(body, &in) != nil || (in.Inbounds == nil && in.Accounts == nil) {
 		fail(w, "this is neither a vpn-lite backup (.json) nor a vpn-ui backup (.db)")
 		return
+	}
+	var withAgency struct {
+		Agency *agencyExport `json:"agency"`
+	}
+	if !fromDB {
+		json.Unmarshal(body, &withAgency)
 	}
 	a.st.Flush()
 	if cur, err := os.ReadFile(a.st.path); err == nil {
@@ -792,7 +869,15 @@ func (a *API) uiRestore(w http.ResponseWriter, r *http.Request) {
 	for _, id := range ids {
 		a.d.ReloadInbound(id)
 	}
-	ok(w, fmt.Sprintf("restored %d services and %d accounts", nIn, nAcc), nil)
+	msg := fmt.Sprintf("restored %d services and %d accounts", nIn, nAcc)
+	if withAgency.Agency != nil && Ag != nil {
+		if err := Ag.Import(*withAgency.Agency); err != nil {
+			msg += "; agencies NOT restored: " + err.Error()
+		} else {
+			msg += fmt.Sprintf(", %d agencies", len(withAgency.Agency.File.Agents))
+		}
+	}
+	ok(w, msg, nil)
 }
 
 // uiImport pulls services and accounts straight from a running vpn-ui panel.
