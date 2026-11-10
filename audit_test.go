@@ -218,8 +218,13 @@ func TestDaemonKeptOnRenderFailure(t *testing.T) {
 func TestPppOptionsDoNotRestartXl2tpd(t *testing.T) {
 	in := &Inbound{ID: 4, Port: 1701, Protocol: "l2tp", Settings: map[string]any{}}
 	if c := xl2tpdConf(in, "/o", ""); !strings.Contains(c, "force userspace = yes") {
-		t.Fatalf("xl2tpd must stay in userspace mode:\n%s", c)
+		t.Fatalf("xl2tpd must stay in userspace mode by default:\n%s", c)
 	}
+	in.Settings["kernelMode"] = true
+	if c := xl2tpdConf(in, "/o", ""); strings.Contains(c, "force userspace") {
+		t.Fatalf("kernel mode switch ignored:\n%s", c)
+	}
+	delete(in.Settings, "kernelMode")
 	opt := pppOptions(in, "/r")
 	if !strings.Contains(opt, "lcp-echo-interval 10") || !strings.Contains(opt, "lcp-echo-failure 6") {
 		t.Fatalf("dead-peer detection should allow 60 s:\n%s", opt)

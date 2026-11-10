@@ -76,10 +76,13 @@ func xl2tpdConf(in *Inbound, optFile, ctlFile string) string {
 	w := func(f string, a ...any) { fmt.Fprintf(&b, f+"\n", a...) }
 	w("[global]")
 	w("port = %d", in.Port)
-	// kernel-mode L2TP (l2tp_ppp) broke L2TP over IPsec behind the relay: right after it was
-	// enabled the control channel stopped answering ("timeout during L2TP tunnel") and live
-	// sessions died with "No response to echo-requests". Userspace mode is what worked.
-	w("force userspace = yes")
+	// Kernel-mode L2TP (l2tp_ppp) is much faster, but behind a relay that shows every customer
+	// with ONE address it breaks: tunnels from the same address and port 1701 cannot be told
+	// apart. It is therefore off unless the admin turns it on for the service ("kernelMode"),
+	// which makes sense once the relay gives each customer an address of its own.
+	if !boolSetting(in.Settings, "kernelMode", false) {
+		w("force userspace = yes")
+	}
 	if l := strings.TrimSpace(in.Listen); l != "" && l != "0.0.0.0" {
 		w("listen-addr = %s", l)
 	}
