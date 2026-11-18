@@ -6,6 +6,7 @@
 
 [![Release](https://img.shields.io/github/v/release/vtajook/vpn-lite?style=flat-square)](https://github.com/vtajook/vpn-lite/releases)
 ![Go](https://img.shields.io/badge/Go-single%20binary-00ADD8?style=flat-square&logo=go)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 ![Platform](https://img.shields.io/badge/Debian%20%7C%20Ubuntu-amd64%20%7C%20arm64-orange?style=flat-square)
 
 [نصب](#-نصب-یک‌خطی) · [امکانات](#-امکانات) · [نمایندگی](#-سیستم-نمایندگی-و-زیرنمایندگی) · [مهاجرت](#-مهاجرت-از-پنل-قبلی) · [API](#-ربات-تلگرام-و-api) · [English](#english)
