@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Daemons is what the API needs from the protocol engines.
@@ -439,6 +440,7 @@ func (a *API) addClient(w http.ResponseWriter, r *http.Request) {
 	a.st.st.Accounts[ekey(email)] = acc
 	a.st.touch()
 	a.st.mu.Unlock()
+	auditAcc("add", acc.Email, 0, acc.ExpiryTime, 0, acc.TotalGB, r)
 	for _, id := range ids {
 		a.d.ReloadInbound(id)
 	}
@@ -519,6 +521,7 @@ func (a *API) updateClient(w http.ResponseWriter, r *http.Request) {
 	}
 	credChanged := acc.Password != c.Password || !strings.EqualFold(acc.Username, newUser) || !c.Enable
 	acc.Username, acc.Password, acc.Enable = newUser, c.Password, c.Enable
+	oldExp, oldTotal := acc.ExpiryTime, acc.TotalGB
 	acc.TotalGB, acc.ExpiryTime, acc.LimitIP = c.TotalGB, c.ExpiryTime, c.LimitIP
 	acc.TgID, acc.Comment, acc.Reset = c.TgID, c.Comment, c.Reset
 	speedChanged := acc.SpeedDown != c.SpeedDown || acc.SpeedUp != c.SpeedUp
@@ -541,8 +544,12 @@ func (a *API) updateClient(w http.ResponseWriter, r *http.Request) {
 	acc.Inbounds = newIDs
 	a.st.touch()
 	email := acc.Email
+	newExp, newTotal := acc.ExpiryTime, acc.TotalGB
 	dead := !acc.Enable || acc.expired(nowMs()) || acc.overQuota()
 	a.st.mu.Unlock()
+	if oldExp != newExp || oldTotal != newTotal {
+		auditAcc("update", email, oldExp, newExp, oldTotal, newTotal, r)
+	}
 	if speedChanged {
 		Shaper.Refresh(email)
 	}
@@ -735,4 +742,18 @@ func (s *Store) portClashLocked(in *Inbound) string {
 		}
 	}
 	return ""
+}
+
+// auditAcc records every change of an account's expiry or quota (who, from where, old -> new),
+// so an unexpected extension can be traced afterwards in events.log (kind "audit").
+func auditAcc(what, email string, oldExp, newExp, oldTotal, newTotal int64, r *http.Request) {
+	day := func(ms int64) string {
+		if ms <= 0 {
+			return "0"
+		}
+		return time.UnixMilli(ms).UTC().Format("2006-01-02T15:04Z")
+	}
+	gb := func(b int64) string { return strconv.FormatFloat(float64(b)/1073741824, 'f', 2, 64) }
+	Events.Add("audit", what, email, "expiry %s -> %s (%+.1f d) gb %s -> %s by=%s ip=%s ua=%.40s",
+		day(oldExp), day(newExp), float64(newExp-oldExp)/86400000, gb(oldTotal), gb(newTotal), actorOf(r), clientIP(r), r.UserAgent())
 }
