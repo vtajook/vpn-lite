@@ -238,6 +238,7 @@ async function pAccounts(c){
    for(let n=s;n<=e;n++)nums.push(b(n,null,false,n===AS.page));
    if(e<pages){if(e<pages-1)nums.push(h("span",{class:"mu"},"…"));nums.push(b(pages))}
    return h("div",{class:"pg"},h("span",{class:"mu"},r.total+" "+t("accounts")),h("span",{class:"pill "+(r.onlineUsers?"active":"disabled"),style:"white-space:nowrap",title:t("onlinehelp")},"● "+t("online")+": "+r.onlineUsers+" "+t("usersw")+" / "+r.sessions+" "+t("connsw")),b(AS.page-1,"‹",AS.page<=1),...nums,b(AS.page+1,"›",AS.page>=pages))};
+  const oldSc=body.querySelector(".sc"),keepX=oldSc?oldSc.scrollLeft:0,keepY=window.scrollY;
   body.replaceChildren(pager(),h("div",{class:"card sc"},r.items.length?h("table",{},h("tr",{},h("th",{},all),["name","protocols","used","expiry","speed","online","enable","status",""].map(k=>h("th",{},k?t(k==="name"?"name":k):""))),
    r.items.map(a=>{const pct=a.total?Math.min(100,(a.up+a.down)*100/a.total):0;
     return h("tr",{},h("td",{},h("input",{type:"checkbox",checked:AS.sel.has(a.email),onchange:e=>{e.target.checked?AS.sel.add(a.email):AS.sel.delete(a.email);drawBulk()}})),
@@ -257,14 +258,15 @@ async function pAccounts(c){
       ib("✎",t("edit"),()=>accountModal(a)),
       ib("🗑",t("del"),async()=>{if(!confirm(t("delq")+"\n"+a.email))return;await bulkOne("delete",a.email);toast(t("saved"));load()},"d")))
    })):h("div",{class:"mu"},t("none"))),
-   pager());drawBulk()}
+   pager());{const ns=body.querySelector(".sc");if(ns&&keepX)ns.scrollLeft=keepX;if(Math.abs(window.scrollY-keepY)>2)window.scrollTo(0,keepY)}drawBulk()}
  function drawBulk(){if(!AS.sel.size){bulk.replaceChildren();return}
   const act=async(a,extra)=>{if(a==="delete"&&!confirm(t("confirm")))return;await post("panel/ui/bulk",{action:a,emails:[...AS.sel],...extra});toast(t("saved"));AS.sel.clear();load()};
   const days=h("input",{type:"number",value:30,style:"width:70px"}),gb=h("input",{type:"number",value:0,style:"width:70px"});
   bulk.replaceChildren(h("div",{class:"bar-sel"},AS.sel.size+" "+t("sel"),h("button",{class:"btn s",onclick:()=>act("enable")},t("enable")),h("button",{class:"btn s",onclick:()=>act("disable")},t("disable")),
    h("button",{class:"btn s",onclick:()=>act("reset")},t("reset")),days,"d",gb,"GB",h("button",{class:"btn s",onclick:()=>act("extend",{days:+days.value,gb:+gb.value})},t("extend")),
    h("button",{class:"btn s d",onclick:()=>act("delete")},t("del")),window.bulkExtra?bulkExtra([...AS.sel],()=>{AS.sel.clear();load()}):null,h("button",{class:"btn s",onclick:()=>{AS.sel.clear();load()}},"✕")))}
- await load();auto(load,6000)}
+ let busy=0;const mark=()=>{busy=Date.now()};["scroll","touchstart","touchmove","pointerdown","wheel","keydown"].forEach(ev=>c.addEventListener(ev,mark,true));
+ await load();auto(()=>Date.now()-busy<6000?Promise.resolve():load(),6000)}
 
 function modal(title,content,actions){const m=h("div",{class:"modal",onclick:e=>e.target===m&&m.remove()},h("div",{class:"card"},h("h3",{style:"margin-top:0"},title),content,h("div",{class:"row",style:"margin:14px 0 0;justify-content:flex-end"},actions)));document.body.append(m);return m}
 const field=(l,el)=>h("div",{class:"row"},h("label",{},l),el);
