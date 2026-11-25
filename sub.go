@@ -36,6 +36,7 @@ type subView struct {
 	Status   string   `json:"status"`
 	Expiry   int64    `json:"expiry"`
 	DaysLeft int      `json:"daysLeft"`
+	Days     int      `json:"days"` // validity bought in total, in days
 	Used     int64    `json:"used"`
 	Total    int64    `json:"total"`
 	Devices  int      `json:"devices"`
@@ -121,7 +122,7 @@ func (a *API) subLookup(subID, reqHost string) (v subView, acc *Account, ok bool
 		}
 	}
 	v = subView{Username: acc.Username, Password: acc.Password, Status: statusOf(acc, now), Expiry: acc.ExpiryTime,
-		Used: acc.Up + acc.Down, Total: acc.TotalGB, Devices: limit}
+		Used: acc.Up + acc.Down, Total: acc.TotalGB, Devices: limit, Days: int((acc.Period + 43199999) / 86400000)}
 	if acc.ExpiryTime > 0 {
 		v.DaysLeft = int((acc.ExpiryTime - now + 86399999) / 86400000)
 		if acc.ExpiryTime <= now {
@@ -286,7 +287,7 @@ button,.b{font:inherit;font-size:13px;border:1px solid var(--bd);background:var(
 <div class="r"><span class="k">نام کاربری</span><span class="v">{{.Username}}</span><button data-c="{{.Username}}">کپی</button></div>
 <div class="r"><span class="k">رمز عبور</span><span class="v">{{.Password}}</span><button data-c="{{.Password}}">کپی</button></div>
 <div class="r"><span class="k">تعداد دستگاه همزمان</span><span class="v t">{{.Devices}}</span></div>
-<div class="r"><span class="k">انقضا</span><span class="v t">{{if .Expiry}}<span data-d="{{iso .Expiry}}">{{iso .Expiry}}</span>{{if gt .DaysLeft 0}} ({{.DaysLeft}} روز مانده){{end}}{{else}}نامحدود{{end}}</span></div>
+<div class="r"><span class="k">انقضا</span><span class="v t">{{if .Expiry}}<span data-d="{{iso .Expiry}}">{{iso .Expiry}}</span>{{if gt .DaysLeft 0}} ({{.DaysLeft}} روز مانده{{if gt .Days 0}} از {{.Days}} روز{{end}}){{end}}{{else}}نامحدود{{end}}</span></div>
 <div style="padding-top:8px"><div class="r" style="border:0;padding:0"><span class="k">حجم مصرفی</span><span class="v t">{{gb .Used}} گیگ از {{if .Total}}{{gb .Total}} گیگ{{else}}نامحدود{{end}}</span></div>
 {{if .Total}}<div class="bar"><i style="width:{{pct .Used .Total}}%"></i></div>{{end}}</div></div>
 {{range .Services}}<div class="c"><h2>{{proto .Protocol}}{{if .Remark}} <span class="k">· {{.Remark}}</span>{{end}}</h2>

@@ -114,6 +114,7 @@ func stateFromVpnUiDB(data []byte) (*State, int, error) {
 			LimitIP: int(asInt(g(ta, r, "limit_ip"))), TgID: asInt(g(ta, r, "tg_id")), Comment: asStr(g(ta, r, "comment")),
 			Reset: int(asInt(g(ta, r, "reset"))), SpeedDown: int(asInt(g(ta, r, "speed_limit_down"))),
 			SpeedUp: int(asInt(g(ta, r, "speed_limit_up"))), CreatedAt: asInt(g(ta, r, "created_at"))}
+		a.backfillPeriod(nowMs())
 		if a.SubID == "" {
 			a.SubID = newSubID()
 		}

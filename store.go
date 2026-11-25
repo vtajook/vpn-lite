@@ -41,6 +41,7 @@ type Account struct {
 	Enable     bool   `json:"enable"`
 	TotalGB    int64  `json:"totalGB"` // bytes, despite the name
 	ExpiryTime int64  `json:"expiryTime"`
+	Period     int64  `json:"period,omitempty"` // ms of validity bought in total (every renewal adds to it); 0 = unlimited or unknown
 	LimitIP    int    `json:"limitIp"`
 	TgID       int64  `json:"tgId"`
 	Comment    string `json:"comment"`
@@ -158,9 +159,13 @@ func OpenStore(path string) (*Store, error) {
 		s.st.NextInbound = 1
 	}
 	s.normalizeKeysLocked()
-	for _, acc := range s.st.Accounts { // every account needs a subscription id
+	for _, acc := range s.st.Accounts { // every account needs a subscription id and a known purchased period
 		if acc.SubID == "" {
 			acc.SubID = newSubID()
+			s.dirty.Store(true)
+		}
+		if acc.Period == 0 && acc.ExpiryTime > 0 {
+			acc.backfillPeriod(nowMs())
 			s.dirty.Store(true)
 		}
 	}
@@ -380,4 +385,62 @@ func (s *Store) addInboundBytes(inbound int, up, down int64) {
 	s.st.Global.TotalUsed += up + down
 	s.touchTraffic()
 	s.mu.Unlock()
+}
+
+// initPeriod records the validity a new account starts with.
+func (a *Account) initPeriod(now int64) {
+	a.Period = 0
+	if a.ExpiryTime > now {
+		a.Period = a.ExpiryTime - now
+	}
+}
+
+// backfillPeriod estimates the total for an account created before periods were tracked:
+// everything from its creation to its expiry date.
+func (a *Account) backfillPeriod(now int64) {
+	a.Period = 0
+	if a.ExpiryTime <= 0 {
+		return
+	}
+	start := a.CreatedAt
+	if start <= 0 || start > a.ExpiryTime {
+		start = now
+	}
+	a.Period = a.ExpiryTime - start
+	if rem := a.ExpiryTime - now; a.Period < rem {
+		a.Period = rem
+	}
+	if a.Period < 0 {
+		a.Period = 0
+	}
+}
+
+// shiftPeriod keeps Period in step when the expiry date changes: a renewal of an expired account
+// counts from now, a renewal of a running one from its old end, so 120 days with 0 left plus one
+// month reads 150/30 and 120 with 30 left plus one month reads 150/60.
+func (a *Account) shiftPeriod(oldExp, newExp, now int64) {
+	switch {
+	case newExp <= 0:
+		a.Period = 0
+		return
+	case oldExp <= 0:
+		a.initPeriod(now)
+		return
+	case a.Period == 0: // an account from before periods were tracked
+		old := *a
+		old.ExpiryTime = oldExp
+		old.backfillPeriod(now)
+		a.Period = old.Period
+	}
+	eff := oldExp
+	if eff < now {
+		eff = now
+	}
+	a.Period += newExp - eff
+	if rem := newExp - now; a.Period < rem {
+		a.Period = rem
+	}
+	if a.Period < 0 {
+		a.Period = 0
+	}
 }

@@ -155,6 +155,7 @@ func importFromPanel(st *Store, from, user, pass string, shift int, enable bool)
 				acc = &Account{Email: email, Username: user, Password: cl.Password, SubID: cl.SubID, Enable: cl.Enable,
 					TotalGB: cl.TotalGB, ExpiryTime: cl.ExpiryTime, LimitIP: cl.LimitIP, TgID: cl.TgID, Comment: cl.Comment,
 					Reset: cl.Reset, SpeedDown: cl.SpeedDown, SpeedUp: cl.SpeedUp, CreatedAt: nowMs()}
+				acc.initPeriod(nowMs())
 				if acc.SubID == "" {
 					acc.SubID = newSubID()
 				}

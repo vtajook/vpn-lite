@@ -123,6 +123,10 @@ type accountRow struct {
 	Up         int64  `json:"up"`
 	Down       int64  `json:"down"`
 	Expiry     int64  `json:"expiry"`
+	Period     int64  `json:"period"`
+	LimitEff   int    `json:"limitEff"` // simultaneous connections allowed (the panel default when the account has none)
+	RateDown   int64  `json:"rateDown"` // live speed, bytes/s (customer download)
+	RateUp     int64  `json:"rateUp"`
 	LimitIP    int    `json:"limitIp"`
 	SpeedDown  int    `json:"speedDown"`
 	SpeedUp    int    `json:"speedUp"`
@@ -149,6 +153,28 @@ func statusOf(a *Account, now int64) string {
 	return "active"
 }
 
+// liveRates sums the current speed (bytes/s) of every live session per account; a session that has
+// not reported for a while counts as idle, because counters arrive every ~5 s (OpenVPN) or ~60 s.
+func liveRates() map[string][2]int64 {
+	m := map[string][2]int64{}
+	now := nowMs()
+	for _, s := range Sessions.Snapshot() {
+		stale := int64(20_000)
+		if protoFamily(s.Proto) != "openvpn" {
+			stale = 150_000
+		}
+		if now-s.LastSeen > stale {
+			continue
+		}
+		k := strings.ToLower(s.Email)
+		r := m[k]
+		r[0] += s.RateDown // what the customer downloads
+		r[1] += s.RateUp
+		m[k] = r
+	}
+	return m
+}
+
 func onlineCounts() map[string]int {
 	m := map[string]int{}
 	for _, s := range Sessions.Snapshot() {
@@ -171,6 +197,7 @@ func (a *API) uiAccounts(w http.ResponseWriter, r *http.Request) {
 		size = 50
 	}
 	on := onlineCounts()
+	rates := liveRates()
 	now := nowMs()
 	me := agentOf(r)
 	owner, ownerSet := -1, r.Form.Get("owner") != ""
@@ -218,7 +245,7 @@ func (a *API) uiAccounts(w http.ResponseWriter, r *http.Request) {
 		}
 		rows = append(rows, accountRow{Email: acc.Email, Username: acc.Username, Password: acc.Password, SubID: acc.SubID,
 			Inbounds: append([]int(nil), acc.Inbounds...), Enable: acc.Enable, Total: acc.TotalGB, Up: acc.Up, Down: acc.Down,
-			Expiry: acc.ExpiryTime, LimitIP: acc.LimitIP, SpeedDown: acc.SpeedDown, SpeedUp: acc.SpeedUp, Single: acc.SingleProto, Reset: acc.Reset,
+			Expiry: acc.ExpiryTime, Period: acc.Period, RateDown: rates[strings.ToLower(acc.Email)][0], RateUp: rates[strings.ToLower(acc.Email)][1], LimitEff: effLimit(acc, a.st.st.Global.DefaultLimit), LimitIP: acc.LimitIP, SpeedDown: acc.SpeedDown, SpeedUp: acc.SpeedUp, Single: acc.SingleProto, Reset: acc.Reset,
 			Comment: acc.Comment, Online: o, LastOnline: acc.LastOnline, Status: st, Owner: acc.Owner, Customer: acc.Customer, Created: acc.CreatedAt})
 	}
 	a.st.mu.RUnlock()
@@ -235,6 +262,15 @@ func (a *API) uiAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(rows, f)
 	total := len(rows)
+	var onlineUsers, sessions, sumDown, sumUp int64
+	for i := range rows { // headline numbers of the whole filtered list, not just this page
+		if rows[i].Online > 0 {
+			onlineUsers++
+			sessions += int64(rows[i].Online)
+		}
+		sumDown += rows[i].RateDown
+		sumUp += rows[i].RateUp
+	}
 	lo := (page - 1) * size
 	if lo > total {
 		lo = total
@@ -243,7 +279,8 @@ func (a *API) uiAccounts(w http.ResponseWriter, r *http.Request) {
 	if hi > total {
 		hi = total
 	}
-	ok(w, "", map[string]any{"total": total, "page": page, "size": size, "items": rows[lo:hi]})
+	ok(w, "", map[string]any{"total": total, "page": page, "size": size, "items": rows[lo:hi],
+		"onlineUsers": onlineUsers, "sessions": sessions, "rateDown": sumDown, "rateUp": sumUp})
 }
 
 func (a *API) uiSummary(w http.ResponseWriter, r *http.Request) {
@@ -397,7 +434,9 @@ func (a *API) uiBulk(w http.ResponseWriter, r *http.Request) {
 				if base < nowMs() {
 					base = nowMs()
 				}
+				oldExp := acc.ExpiryTime
 				acc.ExpiryTime = base + int64((req.Days*24+req.Hours)*3600000)
+				acc.shiftPeriod(oldExp, acc.ExpiryTime, nowMs())
 			}
 			if req.GB > 0 && acc.TotalGB > 0 {
 				acc.TotalGB += int64(req.GB * 1073741824)
@@ -497,6 +536,7 @@ func (a *API) uiBulkCreate(w http.ResponseWriter, r *http.Request) {
 		a.st.st.Accounts[ekey(name)] = &Account{Email: name, Username: name, Password: pw, SubID: newSubID(), Enable: true,
 			TotalGB: int64(req.GB * 1073741824), ExpiryTime: exp, LimitIP: req.LimitIP, SpeedDown: req.SpeedDown,
 			SpeedUp: req.SpeedUp, SingleProto: req.Single, Inbounds: append([]int(nil), req.Inbounds...), CreatedAt: nowMs()}
+		a.st.st.Accounts[ekey(name)].initPeriod(nowMs())
 		out = append(out, made{name, pw})
 	}
 	a.st.touch()
@@ -1018,4 +1058,14 @@ func (a *API) uiInboundReset(w http.ResponseWriter, r *http.Request) {
 	a.st.touch()
 	a.st.mu.Unlock()
 	ok(w, "saved", nil)
+}
+
+func effLimit(acc *Account, def int) int {
+	if acc.LimitIP > 0 {
+		return acc.LimitIP
+	}
+	if def < 1 {
+		return 1
+	}
+	return def
 }

@@ -1161,7 +1161,9 @@ func (a *API) agRenew(r *http.Request, me int, sub map[int]bool, q renewReq) (in
 		return 0, errors.New("account not found")
 	}
 	if q.DaysMs > 0 && acc.ExpiryTime > 0 {
+		oldExp := acc.ExpiryTime
 		acc.ExpiryTime = max(acc.ExpiryTime, now) + q.DaysMs
+		acc.shiftPeriod(oldExp, acc.ExpiryTime, now)
 	}
 	if q.Fresh {
 		acc.TotalGB = int64(math.Round(q.GB * gib))

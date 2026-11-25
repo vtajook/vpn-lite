@@ -58,7 +58,7 @@ const TX={
   L:{maxCustomers:"Max accounts",maxActive:"Max active accounts",maxDailyCreates:"Max new accounts per day",maxSoldGB:"Total GB sold cap",maxDays:"Max days per sale",maxGB:"Max GB per account",maxDevices:"Max devices per account",maxSubAgents:"Max sub-agents",creditLimit:"Credit limit (allowed debt)"},
   PR:{perGB:"Per GB (sale)",perDay:"Per day (sale)",addGB:"Per GB (add/renew)",addDay:"Per day (add/renew)",discount:"Discount %"}}
 };
-for(const l of ["fa","en"])for(const k in TX[l])if(typeof TX[l][k]==="string")T[l][k]=TX[l][k];
+for(const l of ["fa","en"])for(const k in TX[l])if(typeof TX[l][k]==="string"&&!(k in T[l]))T[l][k]=TX[l][k]; // never overwrite the panel's own words (X() reads TX directly)
 const X=k=>(TX[lang]||TX.en)[k];
 const ta=k=>t(k);
 const kindName=k=>X("kinds")[k]||k;

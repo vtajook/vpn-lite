@@ -439,6 +439,7 @@ func (a *API) addClient(w http.ResponseWriter, r *http.Request) {
 		TotalGB: c.TotalGB, ExpiryTime: c.ExpiryTime, LimitIP: c.LimitIP, TgID: c.TgID, Comment: c.Comment,
 		Reset: c.Reset, SpeedDown: c.SpeedDown, SpeedUp: c.SpeedUp, SingleProto: single, Inbounds: ids, CreatedAt: nowMs(),
 		Owner: agentOf(r), Customer: customerOf(r)}
+	acc.initPeriod(acc.CreatedAt)
 	a.st.st.Accounts[ekey(email)] = acc
 	a.st.touch()
 	a.st.mu.Unlock()
@@ -525,6 +526,7 @@ func (a *API) updateClient(w http.ResponseWriter, r *http.Request) {
 	acc.Username, acc.Password, acc.Enable = newUser, c.Password, c.Enable
 	oldExp, oldTotal := acc.ExpiryTime, acc.TotalGB
 	acc.TotalGB, acc.ExpiryTime, acc.LimitIP = c.TotalGB, c.ExpiryTime, c.LimitIP
+	acc.shiftPeriod(oldExp, acc.ExpiryTime, nowMs())
 	acc.TgID, acc.Comment, acc.Reset = c.TgID, c.Comment, c.Reset
 	speedChanged := acc.SpeedDown != c.SpeedDown || acc.SpeedUp != c.SpeedUp
 	acc.SpeedDown, acc.SpeedUp = c.SpeedDown, c.SpeedUp

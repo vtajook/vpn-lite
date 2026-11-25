@@ -26,6 +26,8 @@ type Session struct {
 	Up, Down   int64  // last absolute counters seen (client->server, server->client)
 	LastSeen   int64  // unix ms of the last event for this session
 	LastActive int64  // unix ms of the last report in which the client had sent anything
+	RateUp     int64  // bytes/s the client sent between its last two reports
+	RateDown   int64  // bytes/s the client received between its last two reports
 	dying      bool   // evicted/kicked: no longer counts toward the cap, removed on its Stop event
 }
 
@@ -412,7 +414,11 @@ func (t *SessionTable) Touch(id string, up, down int64) (dUp, dDown int64, s *Se
 	if dDown < 0 {
 		dDown = down
 	}
-	s.Up, s.Down, s.LastSeen = up, down, nowMs()
+	now := nowMs()
+	if dt := now - s.LastSeen; dt >= 500 && s.LastSeen > 0 {
+		s.RateUp, s.RateDown = dUp*1000/dt, dDown*1000/dt
+	}
+	s.Up, s.Down, s.LastSeen = up, down, now
 	if dUp > 0 {
 		s.LastActive = s.LastSeen
 	}
