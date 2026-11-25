@@ -110,6 +110,7 @@ func (a *API) uiRoutes(mux *http.ServeMux) {
 	u("POST", "/restore", a.uiRestore)
 	u("POST", "/backupNow", a.uiBackupNow)
 	u("POST", "/import", a.uiImport)
+	u("POST", "/applyLimits", a.uiApplyLimits)
 }
 
 type accountRow struct {
@@ -1073,4 +1074,9 @@ func effLimit(acc *Account, def int) int {
 		return 1
 	}
 	return def
+}
+
+func (a *API) uiApplyLimits(w http.ResponseWriter, r *http.Request) {
+	acc, ses := a.st.ApplyLimits()
+	ok(w, "", map[string]int{"accounts": acc, "sessions": ses})
 }

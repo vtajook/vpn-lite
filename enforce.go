@@ -432,3 +432,49 @@ func protoFamily(p string) string {
 	}
 	return p
 }
+
+// ApplyLimits is a one-shot: for every account with more live connections than its device cap, the
+// oldest ones are disconnected so that the cap holds from now on. (Logins are always checked
+// against the cap; this only catches connections made before the cap was lowered.)
+func (s *Store) ApplyLimits() (accounts, sessions int) {
+	s.mu.RLock()
+	caps := map[string]int{}
+	for _, acc := range s.st.Accounts {
+		caps[strings.ToLower(acc.Email)] = effLimit(acc, s.st.Global.DefaultLimit)
+	}
+	s.mu.RUnlock()
+	seen := map[string]bool{}
+	for _, sn := range Sessions.Snapshot() {
+		k := strings.ToLower(sn.Email)
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		limit, ok := caps[k]
+		if !ok {
+			continue
+		}
+		Sessions.mu.Lock()
+		live := Sessions.liveOf(sn.Email) // oldest first
+		var drop []*Session
+		if len(live) > limit {
+			drop = live[:len(live)-limit]
+			for _, d := range drop {
+				d.dying = true
+			}
+		}
+		Sessions.mu.Unlock()
+		if len(drop) == 0 {
+			continue
+		}
+		accounts++
+		sessions += len(drop)
+		for _, d := range drop {
+			Events.Add("evict", d.Proto, sn.Email, "over the device cap (%d): disconnected by 'apply the device cap'", limit)
+			if d.Kill != nil {
+				go d.Kill()
+			}
+		}
+	}
+	return
+}

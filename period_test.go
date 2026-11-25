@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"sync"
+	"testing"
+	"time"
+)
 
 func TestPeriodTracking(t *testing.T) {
 	const day = int64(86400000)
@@ -69,5 +73,36 @@ func TestLiveRates(t *testing.T) {
 	s.LastSeen = now - 60_000 // no report for a minute: an OpenVPN session is idle, not "still fast"
 	if _, ok := liveRates()["bob"]; ok {
 		t.Fatal("a stale session still shows a speed")
+	}
+}
+
+func TestApplyLimits(t *testing.T) {
+	st := testStore(t)
+	Sessions = &SessionTable{byID: map[string]*Session{}}
+	defer func() { Sessions = &SessionTable{byID: map[string]*Session{}} }()
+	st.mu.Lock()
+	st.st.Accounts["one"] = &Account{Email: "one", Username: "one", Enable: true, LimitIP: 1}
+	st.st.Accounts["two"] = &Account{Email: "two", Username: "two", Enable: true, LimitIP: 2}
+	st.mu.Unlock()
+	killed := map[string]bool{}
+	var mu sync.Mutex
+	add := func(id, email string, start int64) {
+		Sessions.Add(&Session{ID: id, Email: email, Proto: "openvpn-udp", Start: start, LastSeen: nowMs(),
+			Kill: func() { mu.Lock(); killed[id] = true; mu.Unlock() }})
+	}
+	add("a1", "one", 1000)
+	add("a2", "one", 2000)
+	add("a3", "one", 3000)
+	add("b1", "two", 1000)
+	add("b2", "two", 2000)
+	acc, ses := st.ApplyLimits()
+	time.Sleep(50 * time.Millisecond)
+	if acc != 1 || ses != 2 {
+		t.Fatalf("accounts %d sessions %d", acc, ses)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !killed["a1"] || !killed["a2"] || killed["a3"] || killed["b1"] || killed["b2"] {
+		t.Fatalf("wrong sessions dropped: %v (the newest must stay)", killed)
 	}
 }
