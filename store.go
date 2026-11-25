@@ -158,6 +158,12 @@ func OpenStore(path string) (*Store, error) {
 		s.st.NextInbound = 1
 	}
 	s.normalizeKeysLocked()
+	for _, acc := range s.st.Accounts { // every account needs a subscription id
+		if acc.SubID == "" {
+			acc.SubID = newSubID()
+			s.dirty.Store(true)
+		}
+	}
 	if s.st.Secret == "" {
 		s.st.Secret = randHex(32)
 		s.dirty.Store(true)

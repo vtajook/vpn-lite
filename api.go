@@ -49,6 +49,8 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /logout", a.logout)
 	mux.HandleFunc("GET /{$}", a.page)
 	mux.HandleFunc("GET /agency.js", a.agencyJS)
+	mux.HandleFunc("GET /sub/{sid}", a.subPage) // public: the random subId is the credential
+	mux.HandleFunc("GET /sub/{sid}/ovpn/{id}/{proto}", a.subOvpn)
 
 	ga("/list", a.list, a.agList)
 	ga("/get/{id}", a.get, a.agGet)
