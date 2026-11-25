@@ -337,7 +337,12 @@ func (a *API) uiSummary(w http.ResponseWriter, r *http.Request) {
 	for i := range ins {
 		ins[i].Online = byIn[ins[i].ID]
 	}
-	ok(w, "", map[string]any{"accounts": n, "status": cnt, "usedBytes": used, "totalUp": totUp, "totalDown": totDown, "sessions": len(sess),
+	var liveDown, liveUp int64 // what the customers move right now, summed over every live session
+	for _, r := range liveRates() {
+		liveDown += r[0]
+		liveUp += r[1]
+	}
+	ok(w, "", map[string]any{"liveDown": liveDown, "liveUp": liveUp, "accounts": n, "status": cnt, "usedBytes": used, "totalUp": totUp, "totalDown": totDown, "sessions": len(sess),
 		"onlineUsers": len(users), "inbounds": ins, "sys": readSys()})
 }
 
