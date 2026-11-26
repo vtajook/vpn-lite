@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -63,8 +65,19 @@ func TestSubscriptionPage(t *testing.T) {
 		!strings.Contains(ov.Header().Get("Content-Disposition"), "alice-udp.ovpn") {
 		t.Errorf("ovpn download: %d %s", ov.Code, ov.Body.String())
 	}
-	if !strings.Contains(body, "/ovpn/4/both") {
-		t.Error("page lacks the ovpn button")
+	// follow the download button exactly as a browser would: it must resolve to a file, not a 404
+	m := regexp.MustCompile(`href="([^"]*/ovpn/4/both)"`).FindStringSubmatch(body)
+	if m == nil {
+		t.Fatal("page lacks the ovpn button")
+	}
+	pageURL, _ := url.Parse("https://panel.example.com/sub/abcdef0123456789")
+	ref, _ := url.Parse(m[1])
+	target := pageURL.ResolveReference(ref)
+	if target.Path != "/sub/abcdef0123456789/ovpn/4/both" {
+		t.Fatalf("the button resolves to %s", target.Path)
+	}
+	if dl := get(target.Path); dl.Code != 200 || !strings.Contains(dl.Body.String(), "remote vpn.example.com") {
+		t.Errorf("button target: %d", dl.Code)
 	}
 	// someone else's inbound or a non-openvpn one is never served
 	if c := get("/sub/abcdef0123456789/ovpn/1/both").Code; c != http.StatusNotFound {

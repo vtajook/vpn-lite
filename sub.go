@@ -143,7 +143,7 @@ func (a *API) subLookup(subID, reqHost string) (v subView, acc *Account, ok bool
 		case "openvpn":
 			s.Ovpn = true
 			s.Port = 0
-			base := fmt.Sprintf("sub/%s/ovpn/%d/", subID, id)
+			base := fmt.Sprintf("%ssub/%s/ovpn/%d/", a.base, subID, id) // absolute path, behind the panel base path
 			s.UDP, s.TCP, s.Both = base+"udp", base+"tcp", base+"both"
 		}
 		v.Services = append(v.Services, s)
